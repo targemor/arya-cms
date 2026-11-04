@@ -1,0 +1,93 @@
+<nz-spin [nzSpinning]="loading()">
+  @if (error()) {
+    <nz-empty nzNotFoundContent="No se pudo cargar la biblioteca.">
+      <ng-template #nzNotFoundFooter>
+        <button nz-button type="button" (click)="reload()">Reintentar</button>
+      </ng-template>
+    </nz-empty>
+  } @else if (files().length === 0 && !loading()) {
+    <nz-empty [nzNotFoundContent]="emptyText()" />
+  } @else {
+    <div nz-row [nzGutter]="[16, 16]">
+      @for (file of files(); track file.id) {
+        <div nz-col [nzXs]="12" [nzSm]="8" [nzMd]="6" [nzXl]="4">
+          <nz-card
+            class="media-card"
+            nzSize="small"
+            [class.selectable]="selectable()"
+            [class.selected]="selectable() && file.id === selectedId()"
+            [nzCover]="cover"
+            [nzHoverable]="true"
+            [attr.role]="selectable() ? 'button' : null"
+            [attr.tabindex]="selectable() ? 0 : null"
+            [attr.aria-label]="selectable() ? 'Seleccionar ' + file.name : null"
+            [attr.aria-pressed]="selectable() ? file.id === selectedId() : null"
+            (click)="pick(file)"
+            (keydown.enter)="pick(file, $event)"
+            (keydown.space)="pick(file, $event)"
+          >
+            <div class="media-name" [title]="file.name">{{ file.name }}</div>
+            <div class="media-meta">{{ file.size | fileSize }}</div>
+          </nz-card>
+
+          <ng-template #cover>
+            <div class="media-cover">
+              @if (fileIcon(file); as icon) {
+                <nz-icon class="media-icon" [nzType]="icon" nzTheme="outline" />
+                <span class="media-ext">{{ file.ext || file.mime }}</span>
+              } @else {
+                <img [src]="file.url" [alt]="file.alternativeText || file.name" loading="lazy" />
+              }
+
+              <div class="media-actions">
+                @if (movable()) {
+                  <button
+                    nz-button
+                    nzShape="circle"
+                    nzSize="small"
+                    type="button"
+                    [attr.aria-label]="'Mover ' + file.name"
+                    (click)="requestMove(file, $event)"
+                  >
+                    <nz-icon nzType="folder" />
+                  </button>
+                }
+              @if (deletable()) {
+                <button
+                  class="media-delete"
+                  nz-button
+                  nzType="primary"
+                  nzDanger
+                  nzShape="circle"
+                  nzSize="small"
+                  type="button"
+                  nz-popconfirm
+                  nzPopconfirmTitle="¿Eliminar este archivo? Las entradas que lo usen quedarán sin él."
+                  nzOkText="Eliminar"
+                  nzCancelText="Cancelar"
+                  [nzOkDanger]="true"
+                  [attr.aria-label]="'Eliminar ' + file.name"
+                  [nzLoading]="deleting().has(file.id)"
+                  (nzOnConfirm)="remove(file)"
+                >
+                  <nz-icon nzType="delete" />
+                </button>
+              }
+              </div>
+            </div>
+          </ng-template>
+        </div>
+      }
+    </div>
+
+    @if (total() > pageSize()) {
+      <nz-pagination
+        class="media-pagination"
+        [nzPageIndex]="page()"
+        [nzPageSize]="pageSize()"
+        [nzTotal]="total()"
+        (nzPageIndexChange)="load($event)"
+      />
+    }
+  }
+</nz-spin>

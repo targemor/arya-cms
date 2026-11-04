@@ -9,7 +9,16 @@ import (
 )
 
 // ErrUnexpectedSigningMethod is returned when the JWT signing method is not expected.
-var ErrUnexpectedSigningMethod = errors.New("unexpected signing method")
+var (
+	ErrUnexpectedSigningMethod = errors.New("unexpected signing method")
+	ErrInvalidClaims           = errors.New("invalid claims")
+)
+
+// Claims represents the JWT payload including user ID and role.
+type Claims struct {
+	jwtlib.RegisteredClaims
+	Role string `json:"role"`
+}
 
 // Manager handles JWT token generation and parsing.
 type Manager struct {
@@ -25,11 +34,14 @@ func New(secret string, duration time.Duration) *Manager {
 	}
 }
 
-// GenerateToken creates a new JWT token for the given user ID.
-func (m *Manager) GenerateToken(userID string) (string, error) {
-	token := jwtlib.NewWithClaims(jwtlib.SigningMethodHS256, jwtlib.RegisteredClaims{
-		Subject:   userID,
-		ExpiresAt: jwtlib.NewNumericDate(time.Now().Add(m.duration)),
+// GenerateToken creates a new JWT token for the given user ID and role.
+func (m *Manager) GenerateToken(userID, role string) (string, error) {
+	token := jwtlib.NewWithClaims(jwtlib.SigningMethodHS256, Claims{
+		RegisteredClaims: jwtlib.RegisteredClaims{
+			Subject:   userID,
+			ExpiresAt: jwtlib.NewNumericDate(time.Now().Add(m.duration)),
+		},
+		Role: role,
 	})
 
 	tokenString, err := token.SignedString([]byte(m.secret))
@@ -40,9 +52,9 @@ func (m *Manager) GenerateToken(userID string) (string, error) {
 	return tokenString, nil
 }
 
-// ParseToken validates a JWT token and returns the user ID.
-func (m *Manager) ParseToken(tokenString string) (string, error) {
-	token, err := jwtlib.Parse(tokenString, func(token *jwtlib.Token) (any, error) {
+// ParseToken validates a JWT token and returns the parsed Claims.
+func (m *Manager) ParseToken(tokenString string) (*Claims, error) {
+	token, err := jwtlib.ParseWithClaims(tokenString, &Claims{}, func(token *jwtlib.Token) (any, error) {
 		if _, ok := token.Method.(*jwtlib.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigningMethod, token.Header["alg"])
 		}
@@ -50,13 +62,13 @@ func (m *Manager) ParseToken(tokenString string) (string, error) {
 		return []byte(m.secret), nil
 	})
 	if err != nil {
-		return "", fmt.Errorf("jwt - ParseToken - jwtlib.Parse: %w", err)
+		return nil, fmt.Errorf("jwt - ParseToken - jwtlib.ParseWithClaims: %w", err)
 	}
 
-	sub, err := token.Claims.GetSubject()
-	if err != nil {
-		return "", fmt.Errorf("jwt - ParseToken - GetSubject: %w", err)
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("jwt - ParseToken: %w", ErrInvalidClaims)
 	}
 
-	return sub, nil
+	return claims, nil
 }

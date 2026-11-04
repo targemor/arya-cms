@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Multi-domain clean architecture template with translation, user, and task management",
+        "description": "Clean architecture template with user management",
         "title": "Go Clean Template API",
         "contact": {},
         "version": "1.0"
@@ -115,41 +115,41 @@
                 }
             }
         },
-        "/tasks": {
+        "/content/{tableName}": {
             "get": {
-                "description": "List tasks for the current user with optional filtering",
+                "description": "List entries of a content type. Supports pagination[page], pagination[pageSize], sort=field:asc|desc,... and filters[field][$op]=value with $eq $ne $lt $lte $gt $gte $in $notIn $contains $notContains $containsi $notContainsi $startsWith $endsWith $null $notNull.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "tasks"
+                    "content"
                 ],
-                "summary": "List tasks",
-                "operationId": "list-tasks",
+                "summary": "List entries",
+                "operationId": "list-entries",
                 "parameters": [
                     {
-                        "enum": [
-                            "todo",
-                            "in_progress",
-                            "done"
-                        ],
                         "type": "string",
-                        "description": "Filter by status",
-                        "name": "status",
+                        "description": "Content type",
+                        "name": "tableName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page, from 1",
+                        "name": "pagination[page]",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "default": 10,
-                        "description": "Limit",
-                        "name": "limit",
+                        "description": "Page size, 1-100",
+                        "name": "pagination[pageSize]",
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Offset",
-                        "name": "offset",
+                        "type": "string",
+                        "description": "e.g. createdAt:desc,title:asc",
+                        "name": "sort",
                         "in": "query"
                     }
                 ],
@@ -157,11 +157,29 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v1.TaskList"
+                            "$ref": "#/definitions/v1.ContentEntries"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/v1.Error"
                         }
@@ -180,7 +198,7 @@
                 ]
             },
             "post": {
-                "description": "Create a new task for the current user",
+                "description": "The data object is validated against the content type's JSON Schema.",
                 "consumes": [
                     "application/json"
                 ],
@@ -188,18 +206,25 @@
                     "application/json"
                 ],
                 "tags": [
-                    "tasks"
+                    "content"
                 ],
-                "summary": "Create task",
-                "operationId": "create-task",
+                "summary": "Create entry",
+                "operationId": "create-entry",
                 "parameters": [
                     {
-                        "description": "Task data",
+                        "type": "string",
+                        "description": "Content type",
+                        "name": "tableName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Entry",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/v1.CreateTask"
+                            "$ref": "#/definitions/v1.ContentEntryRequest"
                         }
                     }
                 ],
@@ -207,7 +232,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Task"
+                            "$ref": "#/definitions/v1.ContentEntry"
                         }
                     },
                     "400": {
@@ -218,6 +243,18 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/v1.Error"
                         }
@@ -236,22 +273,21 @@
                 ]
             }
         },
-        "/tasks/{id}": {
+        "/content/{tableName}/single": {
             "get": {
-                "description": "Get a task by ID",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "tasks"
+                    "content"
                 ],
-                "summary": "Get task",
-                "operationId": "get-task",
+                "summary": "Get single entry",
+                "operationId": "get-single-entry",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Task ID",
-                        "name": "id",
+                        "description": "Content type",
+                        "name": "tableName",
                         "in": "path",
                         "required": true
                     }
@@ -260,7 +296,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Task"
+                            "$ref": "#/definitions/v1.ContentEntry"
                         }
                     },
                     "401": {
@@ -295,7 +331,6 @@
                 ]
             },
             "put": {
-                "description": "Update task title and description",
                 "consumes": [
                     "application/json"
                 ],
@@ -303,25 +338,25 @@
                     "application/json"
                 ],
                 "tags": [
-                    "tasks"
+                    "content"
                 ],
-                "summary": "Update task",
-                "operationId": "update-task",
+                "summary": "Update single entry",
+                "operationId": "update-single-entry",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Task ID",
-                        "name": "id",
+                        "description": "Content type",
+                        "name": "tableName",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Updated task data",
+                        "description": "Entry",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/v1.UpdateTask"
+                            "$ref": "#/definitions/v1.ContentEntryRequest"
                         }
                     }
                 ],
@@ -329,7 +364,154 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Task"
+                            "$ref": "#/definitions/v1.ContentEntry"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/content/{tableName}/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content"
+                ],
+                "summary": "Get entry",
+                "operationId": "get-entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Content type",
+                        "name": "tableName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entry id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v1.ContentEntry"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "description": "Partial update: only the fields present in data change. Validated against the content type's JSON Schema.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content"
+                ],
+                "summary": "Update entry",
+                "operationId": "update-entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Content type",
+                        "name": "tableName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entry id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.ContentEntryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v1.ContentEntry"
                         }
                     },
                     "400": {
@@ -370,16 +552,1415 @@
                 ]
             },
             "delete": {
-                "description": "Delete a task by ID",
                 "tags": [
-                    "tasks"
+                    "content"
                 ],
-                "summary": "Delete task",
-                "operationId": "delete-task",
+                "summary": "Delete entry",
+                "operationId": "delete-entry",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Task ID",
+                        "description": "Content type",
+                        "name": "tableName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entry id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/internal/components": {
+            "get": {
+                "description": "List every component defined",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content-type-builder"
+                ],
+                "summary": "List components",
+                "operationId": "list-components",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Component"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Define a new reusable component",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content-type-builder"
+                ],
+                "summary": "Create component",
+                "operationId": "create-component",
+                "parameters": [
+                    {
+                        "description": "Component definition",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.CreateComponent"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Component"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/internal/components/{uid}": {
+            "put": {
+                "description": "Update an existing component",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content-type-builder"
+                ],
+                "summary": "Update component",
+                "operationId": "update-component",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Component UID",
+                        "name": "uid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Component definition",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.UpdateComponent"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Component"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "description": "Delete a component by UID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content-type-builder"
+                ],
+                "summary": "Delete component",
+                "operationId": "delete-component",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Component UID",
+                        "name": "uid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/internal/schemas": {
+            "get": {
+                "description": "List every content type defined in the schemas directory",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content-type-builder"
+                ],
+                "summary": "List content types",
+                "operationId": "list-content-types",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.ContentType"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Define a new content type. Its table is created in Postgres and its JSON Schema is saved to the schemas directory.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content-type-builder"
+                ],
+                "summary": "Create content type",
+                "operationId": "create-content-type",
+                "parameters": [
+                    {
+                        "description": "Content type definition",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.CreateContentType"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ContentType"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/internal/schemas/{tableName}": {
+            "put": {
+                "description": "Update an existing content type's schema and migrate its table",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "content-type-builder"
+                ],
+                "summary": "Update content type",
+                "operationId": "update-content-type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Table name",
+                        "name": "tableName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Content type definition",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.UpdateContentType"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.ContentType"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/projects": {
+            "get": {
+                "description": "Returns all CMS tenant projects",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "List projects",
+                "operationId": "list-projects",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Project"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Creates a new CMS tenant project",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Create project",
+                "operationId": "create-project",
+                "parameters": [
+                    {
+                        "description": "Project details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.CreateProject"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Project"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/projects/{slug}": {
+            "get": {
+                "description": "Returns a CMS tenant project by its slug",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Get project",
+                "operationId": "get-project",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Project"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "description": "Updates an existing CMS tenant project",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Update project",
+                "operationId": "update-project",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Project details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.UpdateProject"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Project"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "description": "Deletes an existing CMS tenant project",
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Delete project",
+                "operationId": "delete-project",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/projects/{slug}/api-keys": {
+            "get": {
+                "description": "Returns all API keys configured for a project",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "List project API keys",
+                "operationId": "list-api-keys",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.APIKey"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Generates a new API key with granular content-type permissions for a project. The raw token is returned once in the response.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Create project API key",
+                "operationId": "create-api-key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "API key configuration",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.CreateAPIKey"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.APIKey"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/projects/{slug}/api-keys/{id}": {
+            "put": {
+                "description": "Updates name, description, access type, and granular permissions for an API key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Update project API key",
+                "operationId": "update-api-key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "API key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "API key configuration",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.UpdateAPIKey"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.APIKey"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "description": "Revokes and deletes a project API key",
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Delete project API key",
+                "operationId": "delete-api-key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "API key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/projects/{slug}/members": {
+            "get": {
+                "description": "Returns all members and their roles for a project",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "List project members",
+                "operationId": "list-project-members",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.ProjectMember"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Assigns a user to a project with a specific role",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Add or update project member",
+                "operationId": "add-project-member",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Member details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.AddProjectMember"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/projects/{slug}/members/{userId}": {
+            "delete": {
+                "description": "Removes a user from a project",
+                "tags": [
+                    "projects"
+                ],
+                "summary": "Remove project member",
+                "operationId": "remove-project-member",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/upload": {
+            "post": {
+                "description": "Store a file in the Media Library. Send multipart/form-data with the file in \"file\" and, optionally, \"alternativeText\" and \"folderId\" (empty: the root).",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "media-library"
+                ],
+                "summary": "Upload file",
+                "operationId": "upload-file",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "File",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Alternative text",
+                        "name": "alternativeText",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Folder id; empty or missing is the library root",
+                        "name": "folderId",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.UploadFile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/upload/files": {
+            "get": {
+                "description": "List the Media Library files directly in one folder (the root when folder is missing), newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "media-library"
+                ],
+                "summary": "List files",
+                "operationId": "list-files",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Folder id; missing is the library root",
+                        "name": "folder",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page, from 1",
+                        "name": "pagination[page]",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size, 1-100",
+                        "name": "pagination[pageSize]",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v1.UploadFiles"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/upload/files/{id}": {
+            "put": {
+                "description": "Move a Media Library file to another folder; a null folderId is the library root.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "media-library"
+                ],
+                "summary": "Move file",
+                "operationId": "move-file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "File id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Destination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.MoveFileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.UploadFile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "description": "Delete a Media Library file: its metadata and the stored object.",
+                "tags": [
+                    "media-library"
+                ],
+                "summary": "Delete file",
+                "operationId": "delete-file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "File id",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -415,9 +1996,45 @@
                 ]
             }
         },
-        "/tasks/{id}/status": {
-            "patch": {
-                "description": "Change task status (todo -\u003e in_progress -\u003e done, or in_progress -\u003e todo)",
+        "/upload/folders": {
+            "get": {
+                "description": "Every Media Library folder, flat and sorted by name. parentId links them into a tree; null is the root.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "media-library"
+                ],
+                "summary": "List folders",
+                "operationId": "list-folders",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Folders"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "description": "Create a Media Library folder, at the root or inside parentId. Names are unique within a folder.",
                 "consumes": [
                     "application/json"
                 ],
@@ -425,33 +2042,26 @@
                     "application/json"
                 ],
                 "tags": [
-                    "tasks"
+                    "media-library"
                 ],
-                "summary": "Transition task status",
-                "operationId": "transition-task",
+                "summary": "Create folder",
+                "operationId": "create-folder",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Task ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "New status",
+                        "description": "Folder",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/v1.TransitionTask"
+                            "$ref": "#/definitions/v1.FolderRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Task"
+                            "$ref": "#/definitions/entity.Folder"
                         }
                     },
                     "400": {
@@ -462,12 +2072,6 @@
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/v1.Error"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/v1.Error"
                         }
@@ -478,6 +2082,12 @@
                             "$ref": "#/definitions/v1.Error"
                         }
                     },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -492,9 +2102,9 @@
                 ]
             }
         },
-        "/translation/do-translate": {
-            "post": {
-                "description": "Translate a text",
+        "/upload/folders/{id}": {
+            "put": {
+                "description": "Rename and/or move a Media Library folder. Send the full state: name and parentId (null: the root).",
                 "consumes": [
                     "application/json"
                 ],
@@ -502,18 +2112,25 @@
                     "application/json"
                 ],
                 "tags": [
-                    "translation"
+                    "media-library"
                 ],
-                "summary": "Translate",
-                "operationId": "do-translate",
+                "summary": "Update folder",
+                "operationId": "update-folder",
                 "parameters": [
                     {
-                        "description": "Set up translation",
+                        "type": "string",
+                        "description": "Folder id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Folder",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/v1.Translate"
+                            "$ref": "#/definitions/v1.FolderRequest"
                         }
                     }
                 ],
@@ -521,7 +2138,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Translation"
+                            "$ref": "#/definitions/entity.Folder"
                         }
                     },
                     "400": {
@@ -536,6 +2153,18 @@
                             "$ref": "#/definitions/v1.Error"
                         }
                     },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -548,28 +2177,41 @@
                         "BearerAuth": []
                     }
                 ]
-            }
-        },
-        "/translation/history": {
-            "get": {
-                "description": "Show all translation history for current user",
-                "produces": [
-                    "application/json"
-                ],
+            },
+            "delete": {
+                "description": "Delete an empty Media Library folder. A folder that still holds files or folders is 409.",
                 "tags": [
-                    "translation"
+                    "media-library"
                 ],
-                "summary": "Show history",
-                "operationId": "history",
+                "summary": "Delete folder",
+                "operationId": "delete-folder",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Folder id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/entity.TranslationHistory"
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/v1.Error"
                         }
@@ -631,88 +2273,505 @@
                     }
                 ]
             }
+        },
+        "/users": {
+            "get": {
+                "description": "List all users (Super Admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "List users",
+                "operationId": "list-users",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.User"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/users/{id}/role": {
+            "put": {
+                "description": "Change user role (Super Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Update user role",
+                "operationId": "update-user-role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Role data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.UpdateUserRole"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/v1.Error"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "definitions": {
-        "entity.Task": {
+        "entity.APIKey": {
             "type": "object",
             "properties": {
-                "created_at": {
+                "accessType": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.APIKeyAccessType"
+                        }
+                    ],
+                    "example": "custom"
+                },
+                "createdAt": {
                     "type": "string",
-                    "example": "2026-01-01T00:00:00Z"
+                    "example": "2026-11-01T12:00:00Z"
                 },
                 "description": {
                     "type": "string",
-                    "example": "Task description"
+                    "example": "Read access for Next.js website"
                 },
                 "id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
-                "status": {
+                "keyPrefix": {
+                    "type": "string",
+                    "example": "cms_8f9d2a1b"
+                },
+                "lastUsedAt": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Frontend Web"
+                },
+                "permissions": {
+                    "type": "object"
+                },
+                "projectId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                },
+                "projectSlug": {
+                    "type": "string",
+                    "example": "default"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "cms_8f9d2a1b3c4d5e6f..."
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2026-11-01T12:00:00Z"
+                }
+            }
+        },
+        "entity.APIKeyAccessType": {
+            "type": "string",
+            "enum": [
+                "custom",
+                "read-only",
+                "full-access"
+            ],
+            "x-enum-varnames": [
+                "APIKeyAccessCustom",
+                "APIKeyAccessReadOnly",
+                "APIKeyAccessFull"
+            ]
+        },
+        "entity.Attribute": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string",
+                    "example": "shared.contact_data"
+                },
+                "displayName": {
+                    "type": "string",
+                    "example": "Title"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "title"
+                },
+                "repeatable": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "required": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "type": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/entity.TaskStatus"
+                            "$ref": "#/definitions/entity.AttributeType"
                         }
                     ],
-                    "example": "todo"
+                    "example": "string"
+                }
+            }
+        },
+        "entity.AttributeType": {
+            "type": "string",
+            "enum": [
+                "string",
+                "integer",
+                "boolean",
+                "media",
+                "component"
+            ],
+            "x-enum-varnames": [
+                "AttributeTypeString",
+                "AttributeTypeInteger",
+                "AttributeTypeBoolean",
+                "AttributeTypeMedia",
+                "AttributeTypeComponent"
+            ]
+        },
+        "entity.Component": {
+            "type": "object",
+            "properties": {
+                "attributes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Attribute"
+                    }
                 },
-                "title": {
+                "category": {
                     "type": "string",
-                    "example": "My task"
+                    "example": "shared"
                 },
-                "updated_at": {
+                "displayName": {
+                    "type": "string",
+                    "example": "Contact Data"
+                },
+                "icon": {
+                    "type": "string",
+                    "example": "phone"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "contact_data"
+                }
+            }
+        },
+        "entity.ContentType": {
+            "type": "object",
+            "properties": {
+                "attributes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Attribute"
+                    }
+                },
+                "displayName": {
+                    "type": "string",
+                    "example": "Articles"
+                },
+                "kind": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.ContentTypeKind"
+                        }
+                    ],
+                    "example": "collectionType"
+                },
+                "tableName": {
+                    "type": "string",
+                    "example": "articles"
+                }
+            }
+        },
+        "entity.ContentTypeKind": {
+            "type": "string",
+            "enum": [
+                "collectionType",
+                "singleType"
+            ],
+            "x-enum-varnames": [
+                "ContentTypeKindCollection",
+                "ContentTypeKindSingle"
+            ]
+        },
+        "entity.Entry": {
+            "type": "object",
+            "additionalProperties": {}
+        },
+        "entity.Folder": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
                     "type": "string",
                     "example": "2026-01-01T00:00:00Z"
                 },
-                "user_id": {
+                "id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Portadas"
+                },
+                "parentId": {
+                    "type": "string",
+                    "example": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2026-01-01T00:00:00Z"
                 }
             }
         },
-        "entity.TaskStatus": {
+        "entity.Pagination": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "pageCount": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "pageSize": {
+                    "type": "integer",
+                    "example": 25
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 87
+                }
+            }
+        },
+        "entity.Project": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string",
+                    "example": "2026-11-01T12:00:00Z"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Ecommerce project"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "imageUrl": {
+                    "type": "string",
+                    "example": "/uploads/2026/11/logo.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "My Shop"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "my_shop"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2026-11-01T12:00:00Z"
+                }
+            }
+        },
+        "entity.ProjectMember": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string",
+                    "example": "2026-11-01T12:00:00Z"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "john@example.com"
+                },
+                "projectId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "role": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.Role"
+                        }
+                    ],
+                    "example": "editor"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2026-11-01T12:00:00Z"
+                },
+                "userId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "johndoe"
+                }
+            }
+        },
+        "entity.Role": {
             "type": "string",
             "enum": [
-                "todo",
-                "in_progress",
-                "done"
+                "superadmin",
+                "admin",
+                "editor",
+                "viewer"
             ],
             "x-enum-varnames": [
-                "TaskStatusTodo",
-                "TaskStatusInProgress",
-                "TaskStatusDone"
+                "RoleSuperAdmin",
+                "RoleAdmin",
+                "RoleEditor",
+                "RoleViewer"
             ]
         },
-        "entity.Translation": {
+        "entity.UploadFile": {
             "type": "object",
             "properties": {
-                "destination": {
+                "alternativeText": {
                     "type": "string",
-                    "example": "en"
+                    "example": "Book cover"
                 },
-                "original": {
+                "createdAt": {
                     "type": "string",
-                    "example": "текст для перевода"
+                    "example": "2026-01-01T00:00:00Z"
                 },
-                "source": {
+                "ext": {
                     "type": "string",
-                    "example": "auto"
+                    "example": ".png"
                 },
-                "translation": {
+                "folderId": {
+                    "description": "FolderID is the Media Library folder holding the file; nil is the library root.",
                     "type": "string",
-                    "example": "text for translation"
-                }
-            }
-        },
-        "entity.TranslationHistory": {
-            "type": "object",
-            "properties": {
-                "history": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/entity.Translation"
-                    }
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "hash": {
+                    "type": "string",
+                    "example": "9f86d081884c7d659a2feaa0c55ad015"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "mime": {
+                    "type": "string",
+                    "example": "image/png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "cover.png"
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "local"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 52341
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2026-01-01T00:00:00Z"
+                },
+                "url": {
+                    "type": "string",
+                    "example": "/uploads/9f86d081884c7d659a2feaa0c55ad015.png"
                 }
             }
         },
@@ -731,6 +2790,14 @@
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
+                "role": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.Role"
+                        }
+                    ],
+                    "example": "superadmin"
+                },
                 "updated_at": {
                     "type": "string",
                     "example": "2026-01-01T00:00:00Z"
@@ -741,21 +2808,236 @@
                 }
             }
         },
-        "v1.CreateTask": {
+        "v1.AddProjectMember": {
             "type": "object",
             "required": [
-                "title"
+                "role",
+                "userId"
+            ],
+            "properties": {
+                "role": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.Role"
+                        }
+                    ],
+                    "example": "editor"
+                },
+                "userId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "v1.ContentEntries": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Entry"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/v1.ContentMeta"
+                }
+            }
+        },
+        "v1.ContentEntry": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/entity.Entry"
+                }
+            }
+        },
+        "v1.ContentEntryRequest": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "v1.ContentMeta": {
+            "type": "object",
+            "properties": {
+                "pagination": {
+                    "$ref": "#/definitions/entity.Pagination"
+                }
+            }
+        },
+        "v1.ContentTypeAttribute": {
+            "type": "object",
+            "required": [
+                "name",
+                "type"
+            ],
+            "properties": {
+                "component": {
+                    "type": "string",
+                    "maxLength": 96,
+                    "example": "shared.contact_data"
+                },
+                "displayName": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "example": "Title"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 48,
+                    "example": "title"
+                },
+                "repeatable": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "required": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "string",
+                        "integer",
+                        "boolean",
+                        "media",
+                        "component"
+                    ],
+                    "example": "string"
+                }
+            }
+        },
+        "v1.CreateAPIKey": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "accessType": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.APIKeyAccessType"
+                        }
+                    ],
+                    "example": "custom"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Read access for Next.js website"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1,
+                    "example": "Frontend Web"
+                },
+                "permissions": {
+                    "type": "object"
+                }
+            }
+        },
+        "v1.CreateComponent": {
+            "type": "object",
+            "required": [
+                "attributes",
+                "name"
+            ],
+            "properties": {
+                "attributes": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/v1.ContentTypeAttribute"
+                    }
+                },
+                "category": {
+                    "type": "string",
+                    "maxLength": 48,
+                    "example": "shared"
+                },
+                "displayName": {
+                    "type": "string",
+                    "example": "Contact Data"
+                },
+                "icon": {
+                    "type": "string",
+                    "example": "phone"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 48,
+                    "example": "contact_data"
+                }
+            }
+        },
+        "v1.CreateContentType": {
+            "type": "object",
+            "required": [
+                "attributes",
+                "tableName"
+            ],
+            "properties": {
+                "attributes": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/v1.ContentTypeAttribute"
+                    }
+                },
+                "displayName": {
+                    "type": "string",
+                    "example": "Articles"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "collectionType",
+                        "singleType"
+                    ],
+                    "example": "collectionType"
+                },
+                "tableName": {
+                    "type": "string",
+                    "maxLength": 48,
+                    "example": "articles"
+                }
+            }
+        },
+        "v1.CreateProject": {
+            "type": "object",
+            "required": [
+                "name",
+                "slug"
             ],
             "properties": {
                 "description": {
                     "type": "string",
-                    "maxLength": 1000,
-                    "example": "Task description"
+                    "example": "Ecommerce project"
                 },
-                "title": {
+                "imageUrl": {
+                    "type": "string",
+                    "example": "/uploads/2026/11/logo.png"
+                },
+                "name": {
                     "type": "string",
                     "maxLength": 255,
-                    "example": "My task"
+                    "minLength": 1,
+                    "example": "My Shop"
+                },
+                "slug": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "example": "my_shop"
                 }
             }
         },
@@ -765,6 +3047,34 @@
                 "error": {
                     "type": "string",
                     "example": "message"
+                }
+            }
+        },
+        "v1.FolderRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "example": "Portadas"
+                },
+                "parentId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "v1.Folders": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Folder"
+                    }
                 }
             }
         },
@@ -785,6 +3095,15 @@
                 }
             }
         },
+        "v1.MoveFileRequest": {
+            "type": "object",
+            "properties": {
+                "folderId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
         "v1.Register": {
             "type": "object",
             "required": [
@@ -802,26 +3121,15 @@
                     "minLength": 6,
                     "example": "secret123"
                 },
+                "role": {
+                    "type": "string",
+                    "example": "admin"
+                },
                 "username": {
                     "type": "string",
                     "maxLength": 255,
                     "minLength": 3,
                     "example": "johndoe"
-                }
-            }
-        },
-        "v1.TaskList": {
-            "type": "object",
-            "properties": {
-                "tasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/entity.Task"
-                    }
-                },
-                "total": {
-                    "type": "integer",
-                    "example": 42
                 }
             }
         },
@@ -834,64 +3142,132 @@
                 }
             }
         },
-        "v1.TransitionTask": {
+        "v1.UpdateAPIKey": {
             "type": "object",
             "required": [
-                "status"
+                "name"
             ],
             "properties": {
-                "status": {
-                    "enum": [
-                        "todo",
-                        "in_progress",
-                        "done"
-                    ],
+                "accessType": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/entity.TaskStatus"
+                            "$ref": "#/definitions/entity.APIKeyAccessType"
                         }
                     ],
-                    "example": "in_progress"
+                    "example": "custom"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Updated permissions"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1,
+                    "example": "Frontend Web Updated"
+                },
+                "permissions": {
+                    "type": "object"
                 }
             }
         },
-        "v1.Translate": {
+        "v1.UpdateComponent": {
             "type": "object",
             "required": [
-                "destination",
-                "original",
-                "source"
+                "attributes"
             ],
             "properties": {
-                "destination": {
-                    "type": "string",
-                    "example": "en"
+                "attributes": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/v1.ContentTypeAttribute"
+                    }
                 },
-                "original": {
+                "displayName": {
                     "type": "string",
-                    "example": "текст для перевода"
+                    "example": "Contact Data"
                 },
-                "source": {
+                "icon": {
                     "type": "string",
-                    "example": "auto"
+                    "example": "phone"
                 }
             }
         },
-        "v1.UpdateTask": {
+        "v1.UpdateContentType": {
             "type": "object",
             "required": [
-                "title"
+                "attributes"
+            ],
+            "properties": {
+                "attributes": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/v1.ContentTypeAttribute"
+                    }
+                },
+                "displayName": {
+                    "type": "string",
+                    "example": "Articles"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "collectionType",
+                        "singleType"
+                    ],
+                    "example": "collectionType"
+                }
+            }
+        },
+        "v1.UpdateProject": {
+            "type": "object",
+            "required": [
+                "name"
             ],
             "properties": {
                 "description": {
                     "type": "string",
-                    "maxLength": 1000,
                     "example": "Updated description"
                 },
-                "title": {
+                "imageUrl": {
+                    "type": "string",
+                    "example": "/uploads/2026/11/logo.png"
+                },
+                "name": {
                     "type": "string",
                     "maxLength": 255,
-                    "example": "Updated task"
+                    "minLength": 1,
+                    "example": "My Shop Renamed"
+                }
+            }
+        },
+        "v1.UpdateUserRole": {
+            "type": "object",
+            "required": [
+                "role"
+            ],
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "example": "superadmin"
+                }
+            }
+        },
+        "v1.UploadFiles": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.UploadFile"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/v1.ContentMeta"
                 }
             }
         }

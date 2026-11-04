@@ -36,6 +36,13 @@ func WriteTimeout(timeout time.Duration) Option {
 	}
 }
 
+// BodyLimit sets the maximum request body size in bytes. Fiber's default is 4 MB.
+func BodyLimit(n int) Option {
+	return func(s *Server) {
+		s.bodyLimit = n
+	}
+}
+
 // ShutdownTimeout -.
 func ShutdownTimeout(timeout time.Duration) Option {
 	return func(s *Server) {

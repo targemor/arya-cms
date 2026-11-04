@@ -1,0 +1,865 @@
+<div class="super-admin-container">
+  <div class="page-header">
+    <div class="header-titles">
+      <h1 class="page-title">
+        <nz-icon nzType="crown" class="title-icon" />
+        Panel de Super Administrador
+      </h1>
+      <p class="page-subtitle">
+        Administración global de proyectos tenant, aislamiento multi-proyecto y niveles de acceso de usuarios.
+      </p>
+    </div>
+  </div>
+
+  <nz-card [nzBordered]="false" class="main-card">
+    <nz-tabs nzType="line">
+      <!-- PESTAÑA 1: PROYECTOS -->
+      <nz-tab [nzTitle]="projectsTabTitle">
+        <ng-template #projectsTabTitle>
+          <nz-icon nzType="appstore" />
+          Proyectos ({{ projectsService.projects().length }})
+        </ng-template>
+
+        <div class="tab-content">
+          <div class="action-bar">
+            <div>
+              <span class="section-title">Proyectos Configurados</span>
+              <span class="section-desc">Cada proyecto opera como un tenant aislado con sus propios content types y tablas.</span>
+            </div>
+            <button nz-button nzType="primary" (click)="openCreateProjectModal()">
+              <nz-icon nzType="plus" />
+              Nuevo Proyecto
+            </button>
+          </div>
+
+          <nz-table
+            #projectTable
+            [nzData]="projectsService.projects()"
+            [nzPageSize]="10"
+            [nzBordered]="true"
+            class="data-table"
+          >
+            <thead>
+              <tr>
+                <th nzWidth="30%">Proyecto</th>
+                <th nzWidth="16%">Identificador (Slug)</th>
+                <th nzWidth="20%">Prefijo PostgreSQL</th>
+                <th>Descripción</th>
+                <th nzWidth="20%" nzAlign="center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (proj of projectTable.data; track proj.id) {
+                <tr [class.active-row]="projectsService.activeSlug() === proj.slug">
+                  <td>
+                    <div class="project-cell">
+                      @if (proj.imageUrl) {
+                        <nz-avatar [nzSrc]="proj.imageUrl" nzShape="square" [nzSize]="40" class="project-avatar" />
+                      } @else {
+                        <nz-avatar nzIcon="appstore" nzShape="square" [nzSize]="40" class="project-avatar-placeholder" />
+                      }
+                      <div class="project-cell-meta">
+                        <span class="project-cell-name">{{ proj.name }}</span>
+                        <div class="tags-row">
+                          @if (projectsService.activeSlug() === proj.slug) {
+                            <nz-tag nzColor="success" class="status-tag">Activo</nz-tag>
+                          }
+                          @if (proj.slug === 'default') {
+                            <nz-tag nzColor="blue" class="status-tag">Predeterminado</nz-tag>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <code class="slug-code">/{{ proj.slug }}</code>
+                  </td>
+                  <td>
+                    <code class="table-prefix-code">content_{{ proj.slug }}_*</code>
+                  </td>
+                  <td>
+                    <span class="desc-text">{{ proj.description || 'Sin descripción' }}</span>
+                  </td>
+                  <td nzAlign="center">
+                    <div class="actions-group">
+                      @if (projectsService.activeSlug() !== proj.slug) {
+                        <button
+                          nz-button
+                          nzType="link"
+                          nzSize="small"
+                          (click)="selectProject(proj)"
+                        >
+                          Seleccionar
+                        </button>
+                      }
+                      <button
+                        nz-button
+                        nzType="link"
+                        nzSize="small"
+                        (click)="openMembersModal(proj)"
+                      >
+                        <nz-icon nzType="team" />
+                        Miembros
+                      </button>
+                      <button
+                        nz-button
+                        nzType="link"
+                        nzSize="small"
+                        (click)="openAPIKeysModal(proj)"
+                      >
+                        <nz-icon nzType="key" />
+                        API Keys
+                      </button>
+                      <button
+                        nz-button
+                        nzType="link"
+                        nzSize="small"
+                        (click)="openEditProjectModal(proj)"
+                      >
+                        <nz-icon nzType="edit" />
+                        Editar
+                      </button>
+                      @if (proj.slug !== 'default') {
+                        <button
+                          nz-button
+                          nzType="link"
+                          nzDanger
+                          nzSize="small"
+                          nz-popconfirm
+                          nzPopconfirmTitle="¿Seguro que deseas eliminar este proyecto y sus esquemas?"
+                          (nzOnConfirm)="deleteProject(proj)"
+                        >
+                          <nz-icon nzType="delete" />
+                          Eliminar
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </nz-table>
+        </div>
+      </nz-tab>
+
+      <!-- PESTAÑA 2: USUARIOS Y ROLES -->
+      <nz-tab [nzTitle]="usersTabTitle">
+        <ng-template #usersTabTitle>
+          <nz-icon nzType="team" />
+          Usuarios y Roles ({{ users().length }})
+        </ng-template>
+
+        <div class="tab-content">
+          <div class="action-bar">
+            <div>
+              <span class="section-title">Control de Acceso y Niveles de Usuario</span>
+              <span class="section-desc">Asigna roles para definir permisos en el CMS (Super Admin, Administrador, Editor, Lector).</span>
+            </div>
+            <button nz-button nzType="default" (click)="loadUsers()">
+              <nz-icon nzType="sync" [nzSpin]="loadingUsers()" />
+              Refrescar
+            </button>
+          </div>
+
+          <nz-table
+            #userTable
+            [nzData]="users()"
+            [nzLoading]="loadingUsers()"
+            [nzPageSize]="10"
+            [nzBordered]="true"
+            class="data-table"
+          >
+            <thead>
+              <tr>
+                <th nzWidth="25%">Usuario</th>
+                <th nzWidth="30%">Correo Electrónico</th>
+                <th nzWidth="20%">Nivel / Rol</th>
+                <th nzWidth="25%">Asignar Rol</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of userTable.data; track user.id) {
+                <tr>
+                  <td>
+                    <div class="user-cell">
+                      <nz-icon nzType="user" class="user-icon" />
+                      <span class="user-cell-name">{{ user.username }}</span>
+                    </div>
+                  </td>
+                  <td>{{ user.email }}</td>
+                  <td>
+                    <nz-tag [nzColor]="getRoleColor(user.role)">
+                      {{ getRoleLabel(user.role) }}
+                    </nz-tag>
+                  </td>
+                  <td>
+                    <nz-select
+                      [ngModel]="user.role"
+                      (ngModelChange)="changeUserRole(user, $event)"
+                      style="width: 180px;"
+                    >
+                      @for (role of availableRoles; track role.value) {
+                        <nz-option [nzValue]="role.value" [nzLabel]="role.label" />
+                      }
+                    </nz-select>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </nz-table>
+        </div>
+      </nz-tab>
+    </nz-tabs>
+  </nz-card>
+</div>
+
+<!-- Modal Crear Proyecto -->
+<nz-modal
+  [nzVisible]="createModalVisible()"
+  nzTitle="Crear Nuevo Proyecto Tenant"
+  [nzOkLoading]="creatingProject()"
+  (nzOnCancel)="closeCreateProjectModal()"
+  (nzOnOk)="submitCreateProject()"
+  nzOkText="Crear Proyecto"
+  nzCancelText="Cancelar"
+>
+  <ng-container *nzModalContent>
+    <form nz-form nzLayout="vertical">
+      <nz-form-item>
+        <nz-form-label nzRequired>Nombre del Proyecto</nz-form-label>
+        <nz-form-control nzErrorTip="Por favor escribe el nombre del proyecto">
+          <input
+            nz-input
+            placeholder="ej. Mi Tienda Online"
+            [ngModel]="projectName"
+            (ngModelChange)="onNameInput($event)"
+            name="projectName"
+            required
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzRequired>Identificador (Slug / Prefijo DB)</nz-form-label>
+        <nz-form-control
+          nzExtra="Se usará como subcarpeta en /schemas/{slug} y prefijo en PostgreSQL (content_{slug}_*)"
+        >
+          <input
+            nz-input
+            placeholder="ej. mi_tienda"
+            [ngModel]="projectSlug"
+            (ngModelChange)="onSlugInput($event)"
+            name="projectSlug"
+            required
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label>Descripción (opcional)</nz-form-label>
+        <nz-form-control>
+          <textarea
+            nz-input
+            rows="2"
+            placeholder="Breve descripción del proyecto o cliente"
+            [(ngModel)]="projectDescription"
+            name="projectDescription"
+          ></textarea>
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label>Logo / Imagen del Proyecto (opcional)</nz-form-label>
+        <nz-form-control nzExtra="Sube una imagen o ingresa una URL para identificar visualmente este proyecto.">
+          <div class="image-uploader-control">
+            <input
+              #createFileInput
+              type="file"
+              accept="image/*"
+              style="display: none"
+              (change)="uploadImage($event, false)"
+            />
+            <div class="image-input-row">
+              <input
+                nz-input
+                placeholder="https://... o /uploads/..."
+                [(ngModel)]="projectImageUrl"
+                name="projectImageUrl"
+              />
+              <button
+                nz-button
+                nzType="default"
+                type="button"
+                [nzLoading]="uploadingCreateImage()"
+                (click)="createFileInput.click()"
+              >
+                <nz-icon nzType="upload" />
+                Subir
+              </button>
+            </div>
+
+            @if (projectImageUrl) {
+              <div class="image-preview-wrapper">
+                <img [src]="projectImageUrl" class="image-preview" alt="Vista previa de logo" />
+                <button
+                  nz-button
+                  nzType="text"
+                  nzDanger
+                  nzSize="small"
+                  type="button"
+                  (click)="clearImage(false)"
+                >
+                  <nz-icon nzType="delete" /> Quitar imagen
+                </button>
+              </div>
+            }
+          </div>
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>
+
+<!-- Modal Editar Proyecto -->
+<nz-modal
+  [nzVisible]="editModalVisible()"
+  nzTitle="Editar Proyecto"
+  [nzOkLoading]="updatingProject()"
+  (nzOnCancel)="closeEditProjectModal()"
+  (nzOnOk)="submitEditProject()"
+  nzOkText="Guardar Cambios"
+  nzCancelText="Cancelar"
+>
+  <ng-container *nzModalContent>
+    <form nz-form nzLayout="vertical">
+      <nz-form-item>
+        <nz-form-label nzRequired>Nombre del Proyecto</nz-form-label>
+        <nz-form-control nzErrorTip="Por favor escribe el nombre del proyecto">
+          <input
+            nz-input
+            placeholder="Nombre del proyecto"
+            [(ngModel)]="editName"
+            name="editName"
+            required
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label>Identificador (Slug)</nz-form-label>
+        <nz-form-control nzExtra="El slug no se puede cambiar ya que define los nombres de tablas y esquemas físicos.">
+          <input
+            nz-input
+            [ngModel]="editSlug"
+            name="editSlug"
+            disabled
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label>Descripción (opcional)</nz-form-label>
+        <nz-form-control>
+          <textarea
+            nz-input
+            rows="2"
+            placeholder="Breve descripción del proyecto o cliente"
+            [(ngModel)]="editDescription"
+            name="editDescription"
+          ></textarea>
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label>Logo / Imagen del Proyecto (opcional)</nz-form-label>
+        <nz-form-control nzExtra="Sube una imagen o ingresa una URL para identificar visualmente este proyecto.">
+          <div class="image-uploader-control">
+            <input
+              #editFileInput
+              type="file"
+              accept="image/*"
+              style="display: none"
+              (change)="uploadImage($event, true)"
+            />
+            <div class="image-input-row">
+              <input
+                nz-input
+                placeholder="https://... o /uploads/..."
+                [(ngModel)]="editImageUrl"
+                name="editImageUrl"
+              />
+              <button
+                nz-button
+                nzType="default"
+                type="button"
+                [nzLoading]="uploadingEditImage()"
+                (click)="editFileInput.click()"
+              >
+                <nz-icon nzType="upload" />
+                Subir
+              </button>
+            </div>
+
+            @if (editImageUrl) {
+              <div class="image-preview-wrapper">
+                <img [src]="editImageUrl" class="image-preview" alt="Vista previa de logo" />
+                <button
+                  nz-button
+                  nzType="text"
+                  nzDanger
+                  nzSize="small"
+                  type="button"
+                  (click)="clearImage(true)"
+                >
+                  <nz-icon nzType="delete" /> Quitar imagen
+                </button>
+              </div>
+            }
+          </div>
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>
+
+<!-- Modal Gestión de Miembros y Roles del Proyecto -->
+<nz-modal
+  [nzVisible]="membersModalVisible()"
+  [nzTitle]="membersModalTitle"
+  [nzFooter]="null"
+  (nzOnCancel)="closeMembersModal()"
+  nzWidth="740px"
+>
+  <ng-template #membersModalTitle>
+    <div class="members-modal-title">
+      <nz-icon nzType="team" class="modal-title-icon" />
+      <span>Miembros y Roles: <strong>{{ selectedProjectForMembers()?.name }}</strong></span>
+      <code class="slug-code">/{{ selectedProjectForMembers()?.slug }}</code>
+    </div>
+  </ng-template>
+
+  <ng-container *nzModalContent>
+    <div class="members-modal-content">
+      <!-- Asignar nuevo usuario -->
+      <div class="assign-member-box">
+        <span class="box-title">Asignar Usuario a este Proyecto</span>
+        <div class="assign-form-row">
+          <nz-select
+            [(ngModel)]="selectedUserIdToAdd"
+            nzPlaceHolder="Seleccionar usuario de la lista"
+            class="assign-user-select"
+            nzShowSearch
+          >
+            @for (u of availableUsersToAdd(); track u.id) {
+              <nz-option [nzValue]="u.id" [nzLabel]="u.username + ' (' + u.email + ')'" />
+            }
+          </nz-select>
+
+          <nz-select [(ngModel)]="selectedMemberRole" class="assign-role-select">
+            @for (r of projectRoles; track r.value) {
+              <nz-option [nzValue]="r.value" [nzLabel]="r.label" />
+            }
+          </nz-select>
+
+          <button
+            nz-button
+            nzType="primary"
+            [nzLoading]="addingMember()"
+            [disabled]="!selectedUserIdToAdd"
+            (click)="addMemberToProject()"
+          >
+            <nz-icon nzType="user-add" />
+            Asignar
+          </button>
+        </div>
+      </div>
+
+      <nz-divider class="modal-divider" />
+
+      <!-- Miembros Actuales -->
+      <div class="members-list-section">
+        <div class="members-list-header">
+          <span class="box-title">Usuarios Asignados ({{ projectMembers().length }})</span>
+          <span class="box-subtitle">Administra los roles específicos de cada usuario en este proyecto.</span>
+        </div>
+
+        <nz-table
+          #membersTable
+          [nzData]="projectMembers()"
+          [nzLoading]="loadingMembers()"
+          [nzShowPagination]="projectMembers().length > 5"
+          [nzPageSize]="5"
+          [nzBordered]="true"
+          nzSize="small"
+        >
+          <thead>
+            <tr>
+              <th nzWidth="30%">Usuario</th>
+              <th nzWidth="32%">Correo Electrónico</th>
+              <th nzWidth="26%">Rol en este Proyecto</th>
+              <th nzWidth="12%" nzAlign="center">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of membersTable.data; track m.userId) {
+              <tr>
+                <td>
+                  <div class="user-cell">
+                    <nz-icon nzType="user" class="user-icon" />
+                    <span class="user-cell-name">{{ m.username }}</span>
+                  </div>
+                </td>
+                <td>{{ m.email }}</td>
+                <td>
+                  <nz-select
+                    [ngModel]="m.role"
+                    (ngModelChange)="updateMemberRole(m, $event)"
+                    style="width: 100%;"
+                    nzSize="small"
+                  >
+                    @for (r of projectRoles; track r.value) {
+                      <nz-option [nzValue]="r.value" [nzLabel]="r.label" />
+                    }
+                  </nz-select>
+                </td>
+                <td nzAlign="center">
+                  <button
+                    nz-button
+                    nzType="link"
+                    nzDanger
+                    nzSize="small"
+                    nz-popconfirm
+                    nzPopconfirmTitle="¿Desvincular a este usuario de este proyecto?"
+                    (nzOnConfirm)="removeMemberFromProject(m)"
+                  >
+                    <nz-icon nzType="delete" />
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </nz-table>
+      </div>
+    </div>
+  </ng-container>
+</nz-modal>
+
+<!-- Modal Gestión de API Keys y Permisos Granulares por Content Type -->
+<nz-modal
+  [nzVisible]="apiKeysModalVisible()"
+  [nzTitle]="apiKeysModalTitle"
+  [nzFooter]="null"
+  (nzOnCancel)="closeAPIKeysModal()"
+  nzWidth="920px"
+>
+  <ng-template #apiKeysModalTitle>
+    <div class="members-modal-title">
+      <nz-icon nzType="key" class="modal-title-icon" />
+      <span>API Keys y Permisos REST: <strong>{{ selectedProjectForKeys()?.name }}</strong></span>
+      <code class="slug-code">/{{ selectedProjectForKeys()?.slug }}</code>
+    </div>
+  </ng-template>
+
+  <ng-container *nzModalContent>
+    <div class="apikeys-modal-content">
+      <!-- Alerta cuando se acaba de generar un nuevo token -->
+      @if (newlyCreatedToken(); as rawToken) {
+        <nz-alert
+          nzType="success"
+          nzShowIcon
+          [nzMessage]="tokenCreatedHeadline"
+          [nzDescription]="tokenCreatedBody"
+          nzCloseable
+          (nzOnClose)="newlyCreatedToken.set(null)"
+          class="token-banner"
+        />
+        <ng-template #tokenCreatedHeadline>
+          <strong>¡API Key generada con éxito!</strong> Copia y guarda este token ahora (por seguridad no volverá a mostrarse completo).
+        </ng-template>
+        <ng-template #tokenCreatedBody>
+          <div class="token-reveal-box">
+            <code class="token-raw-code">{{ rawToken }}</code>
+            <button nz-button nzType="primary" nzSize="small" (click)="copyTokenToClipboard(rawToken)">
+              <nz-icon nzType="copy" />
+              Copiar Token
+            </button>
+          </div>
+          <div class="token-curl-example">
+            <span class="curl-label">Ejemplo de consumo por REST API:</span>
+            <code class="curl-code">curl -H "X-API-Key: {{ rawToken }}" http://localhost:8080/v1/content/{{ projectSchemas()[0]?.tableName || 'mi_coleccion' }}</code>
+          </div>
+        </ng-template>
+      }
+
+      <!-- Barra superior de listado o botón para nueva API Key -->
+      @if (!apiKeyFormVisible()) {
+        <div class="action-bar">
+          <div>
+            <span class="section-title">Tokens de Acceso REST API ({{ projectAPIKeys().length }})</span>
+            <span class="section-desc">
+              Cada API Key está vinculada exclusivamente al proyecto <code>{{ selectedProjectForKeys()?.slug }}</code> y restringe qué operaciones REST se permiten por cada Content Type.
+            </span>
+          </div>
+          <button nz-button nzType="primary" (click)="openCreateAPIKeyForm()">
+            <nz-icon nzType="plus" />
+            Nueva API Key
+          </button>
+        </div>
+
+        <nz-table
+          #apiKeysTable
+          [nzData]="projectAPIKeys()"
+          [nzLoading]="loadingAPIKeys()"
+          [nzShowPagination]="projectAPIKeys().length > 5"
+          [nzPageSize]="5"
+          [nzBordered]="true"
+          nzSize="small"
+        >
+          <thead>
+            <tr>
+              <th nzWidth="22%">Nombre</th>
+              <th nzWidth="14%">Prefijo</th>
+              <th nzWidth="40%">Nivel y Permisos por Content Type</th>
+              <th nzWidth="12%">Último Uso</th>
+              <th nzWidth="12%" nzAlign="center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (key of apiKeysTable.data; track key.id) {
+              <tr>
+                <td>
+                  <div class="apikey-name-cell">
+                    <span class="apikey-name">{{ key.name }}</span>
+                    @if (key.description) {
+                      <span class="apikey-desc">{{ key.description }}</span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <code class="slug-code">{{ key.keyPrefix }}...</code>
+                </td>
+                <td>
+                  <div class="apikey-perms-summary">
+                    <nz-tag [nzColor]="getAccessTypeColor(key.accessType)">
+                      {{ getAccessTypeLabel(key.accessType) }}
+                    </nz-tag>
+
+                    @if (key.accessType === 'custom') {
+                      <div class="custom-perms-pills">
+                        @for (item of getPermissionsSummary(key); track item.table) {
+                          <div class="perm-pill-row">
+                            <code class="perm-table-name">{{ item.table }}:</code>
+                            @for (act of item.actions; track act) {
+                              <nz-tag class="mini-action-tag">{{ act }}</nz-tag>
+                            }
+                          </div>
+                        } @empty {
+                          <span class="no-perms-warning">Sin permisos asignados (bloqueado)</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                </td>
+                <td>
+                  @if (key.lastUsedAt) {
+                    <span class="date-text">{{ key.lastUsedAt | date: 'short' }}</span>
+                  } @else {
+                    <span class="date-text muted">Nunca usado</span>
+                  }
+                </td>
+                <td nzAlign="center">
+                  <div class="actions-group">
+                    <button
+                      nz-button
+                      nzType="link"
+                      nzSize="small"
+                      nz-tooltip
+                      nzTooltipTitle="Configurar permisos granulares"
+                      (click)="openEditAPIKeyForm(key)"
+                    >
+                      <nz-icon nzType="setting" />
+                      Permisos
+                    </button>
+                    <button
+                      nz-button
+                      nzType="link"
+                      nzDanger
+                      nzSize="small"
+                      nz-popconfirm
+                      nzPopconfirmTitle="¿Revocar permanentemente esta API Key?"
+                      (nzOnConfirm)="revokeAPIKey(key)"
+                    >
+                      <nz-icon nzType="delete" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </nz-table>
+      } @else {
+        <!-- Formulario Crear / Editar API Key y Matriz Granular por Content Type -->
+        <div class="apikey-form-card">
+          <div class="apikey-form-header">
+            <div>
+              <span class="box-title">
+                {{ editingAPIKey() ? 'Editar API Key y Permisos: ' + editingAPIKey()?.name : 'Generar Nueva API Key con Permisos Granulares' }}
+              </span>
+              <span class="box-subtitle">
+                Configura el alcance general o marca las acciones exactas permitidas sobre cada Content Type en <code>/v1/content/:tableName</code>.
+              </span>
+            </div>
+            <button nz-button nzType="default" nzSize="small" (click)="cancelAPIKeyForm()">
+              Volver al listado
+            </button>
+          </div>
+
+          <form nz-form nzLayout="vertical" class="apikey-form-grid">
+            <div class="form-row-two-cols">
+              <nz-form-item>
+                <nz-form-label nzRequired>Nombre identificador</nz-form-label>
+                <nz-form-control>
+                  <input
+                    nz-input
+                    placeholder="ej. Frontend Web Público, App Móvil iOS, Integración ERP"
+                    [(ngModel)]="apiKeyName"
+                    name="apiKeyName"
+                  />
+                </nz-form-control>
+              </nz-form-item>
+
+              <nz-form-item>
+                <nz-form-label>Descripción (opcional)</nz-form-label>
+                <nz-form-control>
+                  <input
+                    nz-input
+                    placeholder="Propósito o aplicación que consumirá esta API Key"
+                    [(ngModel)]="apiKeyDescription"
+                    name="apiKeyDescription"
+                  />
+                </nz-form-control>
+              </nz-form-item>
+            </div>
+
+            <nz-form-item>
+              <nz-form-label nzRequired>Tipo de Permiso REST</nz-form-label>
+              <nz-form-control>
+                <nz-radio-group [(ngModel)]="apiKeyAccessType" name="apiKeyAccessType" class="access-type-radios">
+                  <label nz-radio-button nzValue="custom">
+                    <nz-icon nzType="control" /> Personalizado por Content Type (Granular)
+                  </label>
+                  <label nz-radio-button nzValue="read-only">
+                    <nz-icon nzType="eye" /> Solo Lectura (find y findOne en todos)
+                  </label>
+                  <label nz-radio-button nzValue="full-access">
+                    <nz-icon nzType="thunderbolt" /> Acceso Total (CRUD en todos)
+                  </label>
+                </nz-radio-group>
+              </nz-form-control>
+            </nz-form-item>
+
+            @if (apiKeyAccessType === 'custom') {
+              <div class="permissions-matrix-box">
+                <div class="matrix-header">
+                  <div>
+                    <span class="box-title">Matriz de Permisos por Content Type ({{ projectSchemas().length }})</span>
+                    <span class="box-subtitle">
+                      Selecciona qué endpoints REST puede consumir esta API Key en cada Content Type del proyecto.
+                    </span>
+                  </div>
+                  <div class="matrix-quick-actions">
+                    <button nz-button nzType="default" nzSize="small" type="button" (click)="selectReadOnlyPermissionsMatrix()">
+                      Solo Lectura
+                    </button>
+                    <button nz-button nzType="default" nzSize="small" type="button" (click)="selectAllPermissionsMatrix()">
+                      Marcar Todo
+                    </button>
+                    <button nz-button nzType="default" nzSize="small" type="button" (click)="clearAllPermissionsMatrix()">
+                      Limpiar Todo
+                    </button>
+                  </div>
+                </div>
+
+                @if (projectSchemas().length === 0) {
+                  <nz-empty
+                    nzNotFoundContent="Este proyecto aún no tiene Content Types creados. Crea esquemas en el Content-Type Builder para asignar permisos individuales."
+                  />
+                } @else {
+                  <nz-table
+                    #matrixTable
+                    [nzData]="projectSchemas()"
+                    [nzShowPagination]="false"
+                    [nzBordered]="true"
+                    nzSize="small"
+                    class="matrix-table"
+                  >
+                    <thead>
+                      <tr>
+                        <th nzWidth="26%">Content Type</th>
+                        <th nzWidth="14%" nzAlign="center">Todos</th>
+                        @for (action of allAPIKeyActions; track action.value) {
+                          <th nzWidth="12%" nzAlign="center">{{ action.label }}</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (schema of matrixTable.data; track schema.tableName) {
+                        <tr>
+                          <td>
+                            <div class="schema-cell">
+                              <span class="schema-display-name">{{ schema.displayName || schema.tableName }}</span>
+                              <div class="schema-meta-row">
+                                <code class="slug-code">/v1/content/{{ schema.tableName }}</code>
+                                <nz-tag class="mini-kind-tag" [nzColor]="schema.kind === 'singleType' ? 'purple' : 'blue'">
+                                  {{ schema.kind === 'singleType' ? 'Single' : 'Collection' }}
+                                </nz-tag>
+                              </div>
+                            </div>
+                          </td>
+                          <td nzAlign="center">
+                            <label
+                              nz-checkbox
+                              [ngModel]="isAllSelectedForContentType(schema.tableName)"
+                              (ngModelChange)="toggleAllForContentType(schema.tableName, $event)"
+                              [ngModelOptions]="{ standalone: true }"
+                            ></label>
+                          </td>
+                          @for (action of allAPIKeyActions; track action.value) {
+                            <td nzAlign="center">
+                              <label
+                                nz-checkbox
+                                [ngModel]="hasPermission(schema.tableName, action.value)"
+                                (ngModelChange)="togglePermission(schema.tableName, action.value, $event)"
+                                [ngModelOptions]="{ standalone: true }"
+                              ></label>
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </nz-table>
+                }
+              </div>
+            }
+
+            <div class="apikey-form-footer">
+              <button nz-button nzType="default" type="button" (click)="cancelAPIKeyForm()">
+                Cancelar
+              </button>
+              <button
+                nz-button
+                nzType="primary"
+                type="button"
+                [nzLoading]="savingAPIKey()"
+                (click)="submitAPIKeyForm()"
+              >
+                <nz-icon [nzType]="editingAPIKey() ? 'save' : 'key'" />
+                {{ editingAPIKey() ? 'Guardar Cambios de Permisos' : 'Generar API Key' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      }
+    </div>
+  </ng-container>
+</nz-modal>

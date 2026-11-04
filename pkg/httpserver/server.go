@@ -6,9 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/evrone/go-clean-template/pkg/logger"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/lucimux/arya/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -29,6 +29,7 @@ type Server struct {
 
 	address         string
 	prefork         bool
+	bodyLimit       int
 	readTimeout     time.Duration
 	writeTimeout    time.Duration
 	shutdownTimeout time.Duration
@@ -60,6 +61,7 @@ func New(l logger.Interface, opts ...Option) *Server {
 
 	app := fiber.New(fiber.Config{
 		Prefork:      s.prefork,
+		BodyLimit:    s.bodyLimit, // 0 keeps Fiber's default
 		ReadTimeout:  s.readTimeout,
 		WriteTimeout: s.writeTimeout,
 		JSONDecoder:  json.Unmarshal,

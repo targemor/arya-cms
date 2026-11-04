@@ -1,0 +1,73 @@
+:host {
+  display: block;
+}
+
+.browser-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.browser-toolbar a {
+  cursor: pointer;
+}
+
+.crumb-current {
+  font-weight: 500;
+}
+
+.folders {
+  margin-bottom: 16px;
+}
+
+.folder-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 8px 0 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.folder-tile:hover {
+  border-color: #d9d9d9;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+.folder-tile:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
+}
+
+.folder-icon {
+  flex: none;
+  font-size: 22px;
+  color: #faad14;
+}
+
+.folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-menu {
+  flex: none;
+}
+
+.move-subject {
+  margin-bottom: 12px;
+}
+
+.move-target {
+  width: 100%;
+}

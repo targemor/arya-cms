@@ -1,0 +1,51 @@
+<div class="picker">
+  <div class="picker-preview">
+    @if (selected(); as file) {
+      @if (fileIcon(file); as icon) {
+        <nz-icon class="picker-icon" [nzType]="icon" />
+      } @else {
+        <img [src]="file.url" [alt]="file.alternativeText || file.name" />
+      }
+    } @else if (value()) {
+      <nz-icon class="picker-icon" nzType="file" />
+    } @else {
+      <nz-icon class="picker-icon picker-empty" nzType="picture" />
+    }
+  </div>
+
+  <div class="picker-body">
+    <div class="picker-name">
+      @if (selected(); as file) {
+        <span [title]="file.name">{{ file.name }}</span>
+      } @else if (value()) {
+        <span class="picker-muted">Archivo seleccionado</span>
+      } @else {
+        <span class="picker-muted">Ningún archivo</span>
+      }
+    </div>
+
+    <div class="picker-actions">
+      <button nz-button nzSize="small" type="button" [disabled]="disabled()" (click)="open.set(true)">
+        <nz-icon nzType="picture" />
+        {{ value() ? 'Cambiar' : label() }}
+      </button>
+      @if (value()) {
+        <button nz-button nzSize="small" nzType="text" nzDanger type="button" [disabled]="disabled()" (click)="clear()">
+          Quitar
+        </button>
+      }
+    </div>
+  </div>
+</div>
+
+<nz-modal
+  nzTitle="Seleccionar de la Media Library"
+  nzWidth="960px"
+  [nzVisible]="open()"
+  [nzFooter]="null"
+  (nzOnCancel)="close()"
+>
+  <ng-container *nzModalContent>
+    <app-media-browser mode="select" [(folderId)]="folderId" [selectedId]="value()" (select)="choose($event)" />
+  </ng-container>
+</nz-modal>

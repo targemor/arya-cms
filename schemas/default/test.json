@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "test",
+  "type": "object",
+  "properties": {
+    "test": {
+      "type": "integer"
+    },
+    "asd": {
+      "type": "string"
+    },
+    "asdasd": {
+      "type": "boolean"
+    },
+    "asdasdasdad": {
+      "type": "string",
+      "format": "uuid",
+      "x-cms-type": "media"
+    }
+  },
+  "additionalProperties": false
+}

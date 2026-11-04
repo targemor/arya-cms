@@ -1,0 +1,23 @@
+<h2>Media Library</h2>
+
+<nz-upload
+  class="media-upload"
+  nzType="drag"
+  nzName="file"
+  [nzAction]="uploadUrl"
+  [nzMultiple]="true"
+  [nzBeforeUpload]="beforeUpload"
+  [nzData]="uploadData"
+  [nzShowUploadList]="{ showRemoveIcon: true, showPreviewIcon: false, showDownloadIcon: false }"
+  (nzChange)="onChange($event)"
+>
+  <p class="ant-upload-drag-icon">
+    <nz-icon nzType="inbox" />
+  </p>
+  <p class="ant-upload-text">Haz clic o arrastra archivos aquí para subirlos</p>
+  <p class="ant-upload-hint">
+    Se guardan en la carpeta abierta. Imágenes, PDF y documentos de hasta {{ maxSizeMb }} MB; puedes subir varios a la vez.
+  </p>
+</nz-upload>
+
+<app-media-browser mode="manage" [folderId]="folderId()" (folderIdChange)="openFolder($event)" />

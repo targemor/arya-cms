@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["ng", "serve", "--port", "4300"],
+      "cwd": "web",
+      "env": { "API_URL": "http://localhost:18080" },
+      "port": 4300
+    }
+  ]
+}

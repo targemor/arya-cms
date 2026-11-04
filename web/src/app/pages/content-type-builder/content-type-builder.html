@@ -1,0 +1,503 @@
+<div class="strapi-ctb-container">
+  <!-- Left Sub-Sidebar (Strapi Style) -->
+  <aside class="strapi-sub-sider">
+    <div class="sub-sider-header">
+      <div class="header-title-row">
+        <h3 class="sub-sider-title">Content-Type Builder</h3>
+        <div class="header-actions">
+          <button
+            nz-button
+            nzType="primary"
+            nzSize="small"
+            class="save-btn"
+            [disabled]="!isDirty()"
+            [nzLoading]="saving()"
+            (click)="saveCurrent()"
+          >
+            Save
+          </button>
+          <button
+            nz-button
+            nzType="text"
+            nzSize="small"
+            nz-dropdown
+            [nzDropdownMenu]="optionsMenu"
+            aria-label="Opciones"
+          >
+            <nz-icon nzType="ellipsis" />
+          </button>
+          <nz-dropdown-menu #optionsMenu="nzDropdownMenu">
+            <ul nz-menu>
+              <li nz-menu-item (click)="contentTypes.load(); componentsService.load()">
+                <nz-icon nzType="reload" />
+                Recargar schemas
+              </li>
+            </ul>
+          </nz-dropdown-menu>
+        </div>
+      </div>
+
+      <div class="search-box">
+        <nz-input-wrapper>
+          <nz-icon nzInputPrefix nzType="search" class="search-icon" />
+          <input
+            nz-input
+            nzSize="small"
+            placeholder="Search"
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+          />
+        </nz-input-wrapper>
+      </div>
+    </div>
+
+    <div class="sub-sider-nav">
+      <!-- COLLECTION TYPES SECTION -->
+      <div class="nav-section">
+        <div class="section-title">
+          <span>COLLECTION TYPES</span>
+          <span class="count-badge">{{ collectionTypes().length }}</span>
+        </div>
+        <ul class="nav-list">
+          @for (ct of collectionTypes(); track ct.tableName) {
+            <li
+              class="nav-item"
+              [class.active]="isSelected({ tableName: ct.tableName })"
+              (click)="selectContentType(ct)"
+            >
+              <span class="nav-dot">•</span>
+              <span class="nav-label" [title]="ct.displayName || ct.tableName">
+                {{ ct.displayName || ct.tableName }}
+              </span>
+            </li>
+          }
+        </ul>
+        <button
+          nz-button
+          nzType="link"
+          nzSize="small"
+          class="create-link"
+          (click)="openCreateTypeModal('collectionType')"
+        >
+          <nz-icon nzType="plus" />
+          Create new collection type
+        </button>
+      </div>
+
+      <!-- SINGLE TYPES SECTION -->
+      <div class="nav-section">
+        <div class="section-title">
+          <span>SINGLE TYPES</span>
+          <span class="count-badge">{{ singleTypes().length }}</span>
+        </div>
+        <ul class="nav-list">
+          @for (ct of singleTypes(); track ct.tableName) {
+            <li
+              class="nav-item"
+              [class.active]="isSelected({ tableName: ct.tableName })"
+              (click)="selectContentType(ct)"
+            >
+              <span class="nav-dot">•</span>
+              <span class="nav-label" [title]="ct.displayName || ct.tableName">
+                {{ ct.displayName || ct.tableName }}
+              </span>
+            </li>
+          }
+        </ul>
+        <button
+          nz-button
+          nzType="link"
+          nzSize="small"
+          class="create-link"
+          (click)="openCreateTypeModal('singleType')"
+        >
+          <nz-icon nzType="plus" />
+          Create new single type
+        </button>
+      </div>
+
+      <!-- COMPONENTS SECTION -->
+      <div class="nav-section">
+        <div class="section-title">
+          <span>COMPONENTS</span>
+          <span class="count-badge">{{ componentsService.components().length }}</span>
+        </div>
+        @for (cat of componentCategories(); track cat.name) {
+          <div class="category-block">
+            <div class="category-header">
+              <nz-icon nzType="down" class="cat-chevron" />
+              <span class="cat-name">{{ cat.name }}</span>
+            </div>
+            <ul class="nav-list indent">
+              @for (comp of cat.items; track getComponentUID(comp)) {
+                <li
+                  class="nav-item"
+                  [class.active]="isSelected({ uid: getComponentUID(comp) })"
+                  (click)="selectComponent(comp)"
+                >
+                  <span class="nav-dot">•</span>
+                  <span class="nav-label" [title]="comp.displayName || comp.name">
+                    {{ comp.displayName || comp.name }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+        <button
+          nz-button
+          nzType="link"
+          nzSize="small"
+          class="create-link"
+          (click)="openCreateComponentModal()"
+        >
+          <nz-icon nzType="plus" />
+          Create new component
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Panel (Strapi Style) -->
+  <main class="strapi-main-panel">
+    @if (selectedTarget(); as current) {
+      <div class="main-header">
+        <div class="main-title-row">
+          <div>
+            <h1 class="target-title">
+              {{ current.kind === 'contentType' ? (current.data.displayName || current.data.tableName) : (current.data.displayName || current.data.name) }}
+            </h1>
+            <div class="target-subtitle">
+              <nz-tag [nzColor]="current.kind === 'contentType' ? 'blue' : 'purple'">
+                {{ current.kind === 'contentType' ? ((current.data.kind === 'singleType') ? 'Single Type' : 'Collection Type') : 'Component' }}
+              </nz-tag>
+              <span class="muted-id">
+                {{ current.kind === 'contentType' ? ('tabla: ' + current.data.tableName) : ('uid: ' + getComponentUID(current.data)) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="header-right-actions">
+            @if (current.kind === 'contentType') {
+              <a
+                nz-button
+                nzType="default"
+                [routerLink]="['/content-manager', current.data.tableName]"
+              >
+                <nz-icon nzType="database" />
+                Ver datos en Content Manager
+              </a>
+            }
+            <button nz-button nzType="primary" (click)="openAddField()">
+              <nz-icon nzType="plus" />
+              Add another field to this {{ current.kind === 'contentType' ? ((current.data.kind === 'singleType') ? 'single type' : 'collection type') : 'component' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attributes Card (Strapi List Style) -->
+      <div class="fields-card">
+        <div class="fields-list">
+          @for (attr of currentAttributes(); track attr.name; let i = $index) {
+            <div class="field-row">
+              <div class="field-left">
+                <!-- Colored Icon Badge (Strapi Style) -->
+                @switch (attr.type) {
+                  @case ('string') {
+                    <div class="type-badge badge-text">
+                      <span class="badge-text-symbol">Aa</span>
+                    </div>
+                  }
+                  @case ('integer') {
+                    <div class="type-badge badge-number">
+                      <span class="badge-text-symbol">123</span>
+                    </div>
+                  }
+                  @case ('boolean') {
+                    <div class="type-badge badge-boolean">
+                      <nz-icon nzType="check-square" />
+                    </div>
+                  }
+                  @case ('media') {
+                    <div class="type-badge badge-media">
+                      <nz-icon nzType="picture" />
+                    </div>
+                  }
+                  @case ('component') {
+                    <div class="type-badge badge-component">
+                      <nz-icon nzType="appstore" />
+                    </div>
+                  }
+                }
+
+                <div class="field-info">
+                  <div class="field-name-row">
+                    <span class="field-name">
+                      {{ getFieldDisplayName(attr) }}@if (attr.required) {<span class="required-asterisk">*</span>}
+                    </span>
+                    <span class="field-tech-name">({{ attr.name }})</span>
+                  </div>
+                  <span class="field-type-desc">
+                    @switch (attr.type) {
+                      @case ('string') { Text }
+                      @case ('integer') { Number }
+                      @case ('boolean') { Boolean }
+                      @case ('media') { Multiple Media }
+                      @case ('component') {
+                        Component {{ attr.repeatable ? '(repeatable)' : '' }} with {{ attr.component }}
+                      }
+                    }
+                  </span>
+                </div>
+              </div>
+
+              <div class="field-actions">
+                <button
+                  nz-button
+                  nzType="text"
+                  nzSize="small"
+                  aria-label="Editar campo"
+                  (click)="openEditField(i)"
+                >
+                  <nz-icon nzType="edit" />
+                </button>
+                <button
+                  nz-button
+                  nzType="text"
+                  nzDanger
+                  nzSize="small"
+                  aria-label="Eliminar campo"
+                  nz-popconfirm
+                  nzPopconfirmTitle="¿Eliminar este campo?"
+                  nzOkText="Eliminar"
+                  nzCancelText="Cancelar"
+                  [nzOkDanger]="true"
+                  (nzOnConfirm)="removeField(i)"
+                >
+                  <nz-icon nzType="delete" />
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <button nz-button nzType="dashed" nzBlock class="add-field-btn" (click)="openAddField()">
+          <nz-icon nzType="plus" />
+          Add another field to this {{ current.kind === 'contentType' ? ((current.data.kind === 'singleType') ? 'single type' : 'collection type') : 'component' }}
+        </button>
+      </div>
+
+      <nz-collapse class="preview-collapse" nzGhost>
+        <nz-collapse-panel nzHeader="JSON Schema preview">
+          <pre class="preview-code">{{ previewJson() | json }}</pre>
+        </nz-collapse-panel>
+      </nz-collapse>
+    } @else {
+      <nz-empty nzNotFoundContent="Selecciona o crea un tipo de contenido o componente." />
+    }
+  </main>
+</div>
+
+<!-- Modal 1: Create Content Type (Collection or Single) -->
+<nz-modal
+  [nzVisible]="createTypeModalOpen()"
+  [nzTitle]="createTypeKind() === 'singleType' ? 'Create a Single Type' : 'Create a Collection Type'"
+  nzOkText="Continue"
+  nzCancelText="Cancel"
+  [nzOkLoading]="saving()"
+  (nzOnOk)="submitCreateType()"
+  (nzOnCancel)="createTypeModalOpen.set(false)"
+>
+  <ng-container *nzModalContent>
+    <form nz-form nzLayout="vertical" [formGroup]="createTypeForm">
+      <nz-form-item>
+        <nz-form-label nzRequired>Display name</nz-form-label>
+        <nz-form-control nzErrorTip="Obligatorio.">
+          <input
+            nz-input
+            formControlName="displayName"
+            placeholder="e.g. Artesanía / Taller"
+            (ngModelChange)="onDisplayNameChange($event)"
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzRequired>Table name (identificador SQL)</nz-form-label>
+        <nz-form-control nzErrorTip="Solo minúsculas, números y _ ; empieza por una letra." nzExtra="Ej.: artesania_taller, articulos, configuracion_principal">
+          <input nz-input formControlName="tableName" placeholder="artesania_taller" />
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>
+
+<!-- Modal 2: Create Component -->
+<nz-modal
+  [nzVisible]="createComponentModalOpen()"
+  nzTitle="Create a Component"
+  nzOkText="Create component"
+  nzCancelText="Cancel"
+  [nzOkLoading]="saving()"
+  (nzOnOk)="submitCreateComponent()"
+  (nzOnCancel)="createComponentModalOpen.set(false)"
+>
+  <ng-container *nzModalContent>
+    <form nz-form nzLayout="vertical" [formGroup]="createComponentForm">
+      <nz-form-item>
+        <nz-form-label nzRequired>Display name</nz-form-label>
+        <nz-form-control nzErrorTip="Obligatorio.">
+          <input
+            nz-input
+            formControlName="displayName"
+            placeholder="e.g. Datos de Contacto"
+            (ngModelChange)="onCompDisplayNameChange($event)"
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzRequired>Category</nz-form-label>
+        <nz-form-control nzErrorTip="Minúsculas y guiones bajos." nzExtra="Agrupa componentes relacionados (ej. shared, sections, default)">
+          <input nz-input formControlName="category" placeholder="shared" />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzRequired>Name (identificador)</nz-form-label>
+        <nz-form-control nzErrorTip="Solo minúsculas, números y _">
+          <input nz-input formControlName="name" placeholder="datos_de_contacto" />
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>
+
+<!-- Modal 3: Select Field Type Picker (Strapi Style Grid) -->
+<nz-modal
+  [nzVisible]="selectFieldModalOpen()"
+  nzTitle="Select a field for your content type"
+  [nzFooter]="null"
+  nzWidth="680px"
+  (nzOnCancel)="selectFieldModalOpen.set(false)"
+>
+  <ng-container *nzModalContent>
+    <div class="field-picker-grid">
+      @for (t of attributeTypes; track t.value) {
+        <div class="field-card" (click)="chooseFieldType(t.value)">
+          <div class="field-card-icon" [style.background-color]="t.color + '15'" [style.color]="t.color">
+            <nz-icon [nzType]="t.icon" />
+          </div>
+          <div class="field-card-body">
+            <h4 class="field-card-title">{{ t.label }}</h4>
+            <p class="field-card-desc">{{ t.description }}</p>
+          </div>
+        </div>
+      }
+    </div>
+  </ng-container>
+</nz-modal>
+
+<!-- Modal 4: Configure Field (Standard or Component) -->
+<nz-modal
+  [nzVisible]="configureFieldModalOpen()"
+  [nzTitle]="editingFieldIndex() !== null ? 'Edit field' : ('Add new ' + selectedFieldType() + ' field')"
+  nzOkText="Finish"
+  nzCancelText="Cancel"
+  [nzOkLoading]="saving()"
+  (nzOnOk)="submitField()"
+  (nzOnCancel)="configureFieldModalOpen.set(false)"
+>
+  <ng-container *nzModalContent>
+    <form nz-form nzLayout="vertical" [formGroup]="fieldForm">
+      <nz-form-item>
+        <nz-form-label>Nombre visible (Display Name)</nz-form-label>
+        <nz-form-control>
+          <input nz-input formControlName="displayName" placeholder="e.g. Dirección Maps, Galería" />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzRequired>Identificador técnico (Nombre en base de datos)</nz-form-label>
+        <nz-form-control nzErrorTip="Solo minúsculas, números y _ (no puede llamarse id o created_at)">
+          <input nz-input formControlName="name" placeholder="e.g. direccion_maps, galeria" />
+        </nz-form-control>
+      </nz-form-item>
+
+      @if (selectedFieldType() === 'component') {
+        <nz-card nzType="inner" nzTitle="Configuración del Componente">
+          @if (editingFieldIndex() === null) {
+            <nz-form-item>
+              <nz-form-label>Selecciona una opción</nz-form-label>
+              <nz-form-control>
+                <nz-radio-group formControlName="componentMode">
+                  <label nz-radio nzValue="existing">Usar un componente existente</label>
+                  <label nz-radio nzValue="new">Crear un nuevo componente</label>
+                </nz-radio-group>
+              </nz-form-control>
+            </nz-form-item>
+          }
+
+          @if (fieldForm.controls.componentMode.value === 'existing') {
+            <nz-form-item>
+              <nz-form-label nzRequired>Componente</nz-form-label>
+              <nz-form-control nzErrorTip="Selecciona un componente.">
+                <nz-select formControlName="component" nzPlaceHolder="Selecciona un componente">
+                  @for (c of componentsService.components(); track getComponentUID(c)) {
+                    <nz-option
+                      [nzValue]="getComponentUID(c)"
+                      [nzLabel]="(c.displayName || c.name) + ' (' + getComponentUID(c) + ')'"
+                    />
+                  }
+                </nz-select>
+              </nz-form-control>
+            </nz-form-item>
+          } @else {
+            <nz-form-item>
+              <nz-form-label nzRequired>Nombre visible</nz-form-label>
+              <nz-form-control>
+                <input nz-input formControlName="newCompDisplayName" placeholder="e.g. Redes Sociales" />
+              </nz-form-control>
+            </nz-form-item>
+
+            <nz-form-item>
+              <nz-form-label nzRequired>Categoría</nz-form-label>
+              <nz-form-control>
+                <input nz-input formControlName="newCompCategory" placeholder="shared" />
+              </nz-form-control>
+            </nz-form-item>
+
+            <nz-form-item>
+              <nz-form-label nzRequired>Identificador (name)</nz-form-label>
+              <nz-form-control>
+                <input nz-input formControlName="newCompName" placeholder="redes_sociales" />
+              </nz-form-control>
+            </nz-form-item>
+          }
+
+          <nz-form-item>
+            <nz-form-label>Tipo de repetición</nz-form-label>
+            <nz-form-control>
+              <nz-radio-group formControlName="repeatable">
+                <label nz-radio [nzValue]="false">
+                  <strong>Componente único</strong> (un solo objeto anidado)
+                </label>
+                <br />
+                <label nz-radio [nzValue]="true" style="margin-top: 8px;">
+                  <strong>Componente repetible</strong> (una lista/array de entradas de este componente)
+                </label>
+              </nz-radio-group>
+            </nz-form-control>
+          </nz-form-item>
+        </nz-card>
+      }
+
+      <nz-form-item style="margin-top: 16px;">
+        <label nz-checkbox formControlName="required">
+          <strong>Campo obligatorio</strong> (no se podrá guardar la entrada vacía)
+        </label>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>

@@ -7,9 +7,12 @@ include .env.example
 export
 endif
 
+# On Windows, Git Bash (MSYS) runs the recipes and rewrites env values that look like POSIX paths
+# when it starts a native program: UPLOADS_PUBLIC_PATH=/uploads would reach the app as
+# "C:/Program Files/Git/uploads". Exclude it from that conversion; elsewhere this does nothing.
+export MSYS2_ENV_CONV_EXCL = UPLOADS_PUBLIC_PATH
+
 BASE_STACK = docker compose -f docker-compose.yml
-INTEGRATION_TEST_STACK = $(BASE_STACK) -f docker-compose-integration-test.yml
-ALL_STACK = $(INTEGRATION_TEST_STACK)
 
 # HELP =================================================================================================================
 # This will output the help for each task
@@ -20,33 +23,20 @@ help: ## Display this help screen
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 compose-up: ### Run docker compose (without backend and reverse proxy)
-	$(BASE_STACK) up --build -d db rabbitmq nats && docker compose logs -f
+	$(BASE_STACK) up --build -d db && docker compose logs -f
 .PHONY: compose-up
 
 compose-up-all: ### Run docker compose (with backend and reverse proxy)
 	$(BASE_STACK) up --build -d
 .PHONY: compose-up-all
 
-compose-up-integration-test: ### Run docker compose with integration test
-	$(INTEGRATION_TEST_STACK) up --build --abort-on-container-exit --exit-code-from integration-test; exit_code=$$?; \
-	$(INTEGRATION_TEST_STACK) down --remove-orphans; exit $$exit_code
-.PHONY: compose-up-integration-test
-
 compose-down: ### Down docker compose
-	$(ALL_STACK) down --remove-orphans
+	$(BASE_STACK) down --remove-orphans
 .PHONY: compose-down
 
 swag-v1: ### swag init
 	swag init --parseDependency -g internal/controller/restapi/router.go
 .PHONY: swag-v1
-
-proto-v1: ### generate source files from proto
-	protoc --go_out=. \
-		--go_opt=paths=source_relative \
-		--go-grpc_out=. \
-		--go-grpc_opt=paths=source_relative \
-		docs/proto/v1/*.proto
-.PHONY: proto-v1
 
 deps: ### deps tidy + verify
 	go mod tidy && go mod verify
@@ -66,13 +56,33 @@ format: ### Run code formatter
 	gci write . --skip-generated -s standard -s default
 .PHONY: format
 
-run: deps swag-v1 proto-v1 ### swag run for API v1
+# Port of the admin web in `make dev`; the API keeps HTTP_PORT from .env.
+WEB_PORT ?= 4200
+
+dev: web/node_modules ### Run Postgres, the API (with migrations) and the admin web on :4200 together; SKIP_DB=1 to use your own Postgres
+ifneq ($(SKIP_DB),1)
+	$(BASE_STACK) up -d db
+endif
+	npm --prefix web exec -- concurrently --kill-others --names api,web --prefix-colors blue,green \
+		"go run -tags migrate ./cmd/app" \
+		"npm --prefix web start -- --port $(WEB_PORT)"
+.PHONY: dev
+
+# Set here rather than as `VAR=x cmd`: on Windows concurrently runs the commands through cmd.exe.
+dev: export CGO_ENABLED = 0
+dev: export API_URL = http://localhost:$(HTTP_PORT)
+
+web/node_modules: web/package-lock.json
+	npm --prefix web ci
+	@touch web/node_modules
+
+run: deps swag-v1 ### swag run for API v1
 	go mod download && \
 	CGO_ENABLED=0 go run -tags migrate ./cmd/app
 .PHONY: run
 
-docker-rm-volume: ### remove docker volume
-	docker volume rm go-clean-template_pg-data
+docker-rm-volume: ### remove the Postgres docker volume
+	docker volume rm go-clean-template_db_data
 .PHONY: docker-rm-volume
 
 linter-golangci: ### check by golangci linter
@@ -90,10 +100,6 @@ linter-dotenv: ### check by dotenv linter
 test: ### run test
 	go test -v -race -covermode atomic -coverprofile=coverage.txt ./internal/... ./pkg/...
 .PHONY: test
-
-integration-test: ### run integration-test
-	go clean -testcache && go test -v ./integration-test/...
-.PHONY: integration-test
 
 mock: ### run mockgen
 	mockgen -source ./internal/repo/contracts.go -package usecase_test > ./internal/usecase/mocks_repo_test.go
@@ -113,5 +119,5 @@ bin-deps: ### install tools
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate
 .PHONY: bin-deps
 
-pre-commit: deps swag-v1 proto-v1 mock format linter-golangci test ### run pre-commit
+pre-commit: deps swag-v1 mock format linter-golangci test ### run pre-commit
 .PHONY: pre-commit

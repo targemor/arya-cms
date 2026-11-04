@@ -102,10 +102,6 @@ linters:
     rules:
       - linters:
           - godot
-          - paralleltest
-        path: integration-test
-      - linters:
-          - godot
         path: internal
     paths:
       - bin/

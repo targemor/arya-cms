@@ -7,102 +7,122 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/evrone/go-clean-template/config"
-	amqprpc "github.com/evrone/go-clean-template/internal/controller/amqp_rpc"
-	"github.com/evrone/go-clean-template/internal/controller/grpc"
-	grpcmw "github.com/evrone/go-clean-template/internal/controller/grpc/middleware"
-	natsrpc "github.com/evrone/go-clean-template/internal/controller/nats_rpc"
-	"github.com/evrone/go-clean-template/internal/controller/restapi"
-	persistTaskRepo "github.com/evrone/go-clean-template/internal/repo/persistent/task"
-	persistTranslationRepo "github.com/evrone/go-clean-template/internal/repo/persistent/translation"
-	persistUserRepo "github.com/evrone/go-clean-template/internal/repo/persistent/user"
-	"github.com/evrone/go-clean-template/internal/repo/webapi"
-	"github.com/evrone/go-clean-template/internal/usecase"
-	"github.com/evrone/go-clean-template/internal/usecase/task"
-	"github.com/evrone/go-clean-template/internal/usecase/translation"
-	"github.com/evrone/go-clean-template/internal/usecase/user"
-	"github.com/evrone/go-clean-template/pkg/grpcserver"
-	"github.com/evrone/go-clean-template/pkg/httpserver"
-	"github.com/evrone/go-clean-template/pkg/jwt"
-	"github.com/evrone/go-clean-template/pkg/logger"
-	natsRPCServer "github.com/evrone/go-clean-template/pkg/nats/nats_rpc/server"
-	"github.com/evrone/go-clean-template/pkg/postgres"
-	rmqRPCServer "github.com/evrone/go-clean-template/pkg/rabbitmq/rmq_rpc/server"
-	"github.com/evrone/go-clean-template/pkg/tracing"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	pbgrpc "google.golang.org/grpc"
+	"github.com/lucimux/arya/config"
+	"github.com/lucimux/arya/internal/controller/restapi"
+	fileComponentRepo "github.com/lucimux/arya/internal/repo/filestore/component"
+	fileContentTypeRepo "github.com/lucimux/arya/internal/repo/filestore/contenttype"
+	persistContentRepo "github.com/lucimux/arya/internal/repo/persistent/content"
+	persistContentTypeRepo "github.com/lucimux/arya/internal/repo/persistent/contenttype"
+	persistFolderRepo "github.com/lucimux/arya/internal/repo/persistent/folder"
+	persistProjectRepo "github.com/lucimux/arya/internal/repo/persistent/project"
+	persistUploadRepo "github.com/lucimux/arya/internal/repo/persistent/upload"
+	persistUserRepo "github.com/lucimux/arya/internal/repo/persistent/user"
+	localStorage "github.com/lucimux/arya/internal/repo/storage/local"
+	"github.com/lucimux/arya/internal/usecase"
+	"github.com/lucimux/arya/internal/usecase/component"
+	"github.com/lucimux/arya/internal/usecase/content"
+	"github.com/lucimux/arya/internal/usecase/contenttype"
+	"github.com/lucimux/arya/internal/usecase/folder"
+	"github.com/lucimux/arya/internal/usecase/project"
+	"github.com/lucimux/arya/internal/usecase/upload"
+	"github.com/lucimux/arya/internal/usecase/user"
+	"github.com/lucimux/arya/pkg/fswatcher"
+	"github.com/lucimux/arya/pkg/httpserver"
+	"github.com/lucimux/arya/pkg/jwt"
+	"github.com/lucimux/arya/pkg/logger"
+	"github.com/lucimux/arya/pkg/postgres"
+	"github.com/lucimux/arya/pkg/tracing"
 )
 
+const _megabyte = 1 << 20
+
+// _schemaSyncTimeout bounds one pass of applying the schema files to the database.
+const _schemaSyncTimeout = 30 * time.Second
+
 type useCases struct {
-	translation usecase.Translation
+	project     usecase.Project
 	user        usecase.User
-	task        usecase.Task
+	contentType usecase.ContentType
+	component   usecase.Component
+	content     usecase.Content
+	upload      usecase.Upload
+	folder      usecase.Folder
 }
 
 type servers struct {
-	rmq  *rmqRPCServer.Server
-	nats *natsRPCServer.Server
-	grpc *grpcserver.Server
 	http *httpserver.Server
 }
 
-func initUseCases(pg *postgres.Postgres, jwtManager *jwt.Manager) useCases {
-	translationRepo := persistTranslationRepo.New(pg)
-	taskRepo := persistTaskRepo.New(pg)
+func initUseCases(cfg *config.Config, pg *postgres.Postgres, jwtManager *jwt.Manager) useCases {
+	projectRepo := persistProjectRepo.New(pg)
+	projectUseCase := project.New(projectRepo)
 	userRepo := persistUserRepo.New(pg)
+	contentTypeStore := fileContentTypeRepo.New(cfg.Schemas.Dir)
+	contentTypeMigrator := persistContentTypeRepo.New(pg)
+
+	contentTypeUseCase := contenttype.New(contentTypeStore, contentTypeMigrator)
+	componentStore := fileComponentRepo.New(cfg.Schemas.Dir)
+	componentUseCase := component.New(componentStore)
+	uploadRepo := persistUploadRepo.New(pg)
+	folderRepo := persistFolderRepo.New(pg)
 
 	return useCases{
+		project:     projectUseCase,
 		user:        user.New(userRepo, jwtManager),
-		task:        task.New(taskRepo),
-		translation: translation.New(translationRepo, webapi.New()),
+		contentType: contentTypeUseCase,
+		component:   componentUseCase,
+		content:     content.New(contentTypeUseCase, persistContentRepo.New(pg)),
+		upload: upload.New(
+			uploadRepo,
+			folderRepo,
+			localStorage.New(cfg.Uploads.Dir, cfg.Uploads.PublicPath),
+			int64(cfg.Uploads.MaxSizeMB)*_megabyte,
+		),
+		folder: folder.New(folderRepo, uploadRepo),
 	}
 }
 
-func initServers(cfg *config.Config, uc useCases, jwtManager *jwt.Manager, l logger.Interface) servers {
-	// RabbitMQ RPC Server
-	rmqRouter := amqprpc.NewRouter(uc.translation, uc.user, uc.task, jwtManager, l)
+// startSchemaWatcher applies the schema files to the database now and again whenever one
+// changes on disk. The watcher starts first so no change between the two is missed.
+func startSchemaWatcher(cfg *config.Config, uc *useCases, l logger.Interface) (*fswatcher.Watcher, error) {
+	syncSchemas := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), _schemaSyncTimeout)
+		defer cancel()
 
-	rmqServer, err := rmqRPCServer.New(cfg.RMQ.URL, cfg.RMQ.ServerExchange, rmqRouter, l)
-	if err != nil {
-		l.Fatal(fmt.Errorf("app - Run - rmqServer - server.New: %w", err))
+		if err := uc.contentType.Sync(ctx); err != nil {
+			l.Error(fmt.Errorf("app - Run - uc.contentType.Sync: %w", err))
+		}
 	}
 
-	// NATS RPC Server
-	natsRouter := natsrpc.NewRouter(uc.translation, uc.user, uc.task, jwtManager, l)
-
-	natsServer, err := natsRPCServer.New(cfg.NATS.URL, cfg.NATS.ServerExchange, natsRouter, l)
+	w, err := fswatcher.New(cfg.Schemas.Dir, syncSchemas, fswatcher.OnError(func(err error) {
+		l.Error(fmt.Errorf("app - Run - fswatcher: %w", err))
+	}))
 	if err != nil {
-		l.Fatal(fmt.Errorf("app - Run - natsServer - server.New: %w", err))
+		return nil, fmt.Errorf("app - Run - fswatcher.New: %w", err)
 	}
 
-	// gRPC Server
-	grpcServer := grpcserver.New(
-		l,
-		grpcserver.Port(cfg.GRPC.Port),
-		grpcserver.ServerOptions(
-			pbgrpc.UnaryInterceptor(grpcmw.AuthInterceptor(jwtManager)),
-			pbgrpc.StatsHandler(otelgrpc.NewServerHandler()),
-		),
-	)
-	grpc.NewRouter(grpcServer.App, uc.translation, uc.user, uc.task, l)
+	w.Start()
+	syncSchemas()
 
+	return w, nil
+}
+
+func initServers(cfg *config.Config, uc *useCases, jwtManager *jwt.Manager, l logger.Interface) servers {
 	// HTTP Server
-	httpServer := httpserver.New(l, httpserver.Port(cfg.HTTP.Port), httpserver.Prefork(cfg.HTTP.UsePreforkMode))
-	restapi.NewRouter(httpServer.App, cfg, uc.translation, uc.user, uc.task, jwtManager, l)
+	httpServer := httpserver.New(l,
+		httpserver.Port(cfg.HTTP.Port),
+		httpserver.Prefork(cfg.HTTP.UsePreforkMode),
+		// Room for the largest upload plus its multipart envelope.
+		httpserver.BodyLimit((cfg.Uploads.MaxSizeMB+1)*_megabyte),
+	)
+	restapi.NewRouter(httpServer.App, cfg, uc.project, uc.user, uc.contentType, uc.component, uc.content, uc.upload, uc.folder, jwtManager, l)
 
-	return servers{
-		rmq:  rmqServer,
-		nats: natsServer,
-		grpc: grpcServer,
-		http: httpServer,
-	}
+	return servers{http: httpServer}
 }
 
 func (s *servers) startServers() {
-	s.rmq.Start()
-	s.nats.Start()
-	s.grpc.Start()
 	s.http.Start()
 }
 
@@ -117,12 +137,6 @@ func (s *servers) waitForShutdown(l logger.Interface) {
 		l.Info("app - Run - signal: %s", sig.String())
 	case err = <-s.http.Notify():
 		l.Error(fmt.Errorf("app - Run - httpServer.Notify: %w", err))
-	case err = <-s.grpc.Notify():
-		l.Error(fmt.Errorf("app - Run - grpcServer.Notify: %w", err))
-	case err = <-s.rmq.Notify():
-		l.Error(fmt.Errorf("app - Run - rmqServer.Notify: %w", err))
-	case err = <-s.nats.Notify():
-		l.Error(fmt.Errorf("app - Run - natsServer.Notify: %w", err))
 	}
 
 	s.shutdownServers(l)
@@ -131,18 +145,6 @@ func (s *servers) waitForShutdown(l logger.Interface) {
 func (s *servers) shutdownServers(l logger.Interface) {
 	if err := s.http.Shutdown(); err != nil {
 		l.Error(fmt.Errorf("app - Run - httpServer.Shutdown: %w", err))
-	}
-
-	if err := s.grpc.Shutdown(); err != nil {
-		l.Error(fmt.Errorf("app - Run - grpcServer.Shutdown: %w", err))
-	}
-
-	if err := s.rmq.Shutdown(); err != nil {
-		l.Error(fmt.Errorf("app - Run - rmqServer.Shutdown: %w", err))
-	}
-
-	if err := s.nats.Shutdown(); err != nil {
-		l.Error(fmt.Errorf("app - Run - natsServer.Shutdown: %w", err))
 	}
 }
 
@@ -180,8 +182,20 @@ func Run(cfg *config.Config) {
 	// JWT
 	jwtManager := jwt.New(cfg.JWT.Secret, cfg.JWT.TokenExpiry)
 
-	uc := initUseCases(pg, jwtManager)
-	s := initServers(cfg, uc, jwtManager, l)
+	uc := initUseCases(cfg, pg, jwtManager)
+
+	// Content-Type Builder
+	watcher, err := startSchemaWatcher(cfg, &uc, l)
+	if err != nil {
+		l.Fatal(err)
+	}
+	defer func() {
+		if err := watcher.Close(); err != nil {
+			l.Error(fmt.Errorf("app - Run - watcher.Close: %w", err))
+		}
+	}()
+
+	s := initServers(cfg, &uc, jwtManager, l)
 	s.startServers()
 	s.waitForShutdown(l)
 }

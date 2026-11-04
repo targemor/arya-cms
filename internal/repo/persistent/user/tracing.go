@@ -3,15 +3,15 @@ package user
 import (
 	"context"
 
-	"github.com/evrone/go-clean-template/internal/entity"
-	"github.com/evrone/go-clean-template/internal/repo"
+	"github.com/lucimux/arya/internal/entity"
+	"github.com/lucimux/arya/internal/repo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
-const _tracerName = "github.com/evrone/go-clean-template/internal/repo/persistent/user"
+const _tracerName = "github.com/lucimux/arya/internal/repo/persistent/user"
 
 // tracedRepo wraps a UserRepo with OpenTelemetry spans.
 type tracedRepo struct {
@@ -60,4 +60,22 @@ func (r *tracedRepo) GetByEmail(ctx context.Context, email string) (entity.User,
 	endSpan(span, err)
 
 	return result, err
+}
+
+func (r *tracedRepo) List(ctx context.Context) ([]entity.User, error) {
+	ctx, span := startSpan(ctx, "UserRepo.List")
+
+	result, err := r.next.List(ctx)
+	endSpan(span, err)
+
+	return result, err
+}
+
+func (r *tracedRepo) UpdateRole(ctx context.Context, id string, role entity.Role) error {
+	ctx, span := startSpan(ctx, "UserRepo.UpdateRole", attribute.String("user.id", id), attribute.String("user.role", string(role)))
+
+	err := r.next.UpdateRole(ctx, id, role)
+	endSpan(span, err)
+
+	return err
 }

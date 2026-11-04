@@ -1,0 +1,294 @@
+<nz-layout class="shell">
+  <nz-sider
+    class="sider"
+    nzCollapsible
+    nzBreakpoint="lg"
+    nzWidth="220px"
+    [nzCollapsedWidth]="64"
+    [nzTrigger]="null"
+    [nzCollapsed]="collapsed()"
+    (nzCollapsedChange)="collapsed.set($event)"
+  >
+    <a class="brand" routerLink="/">
+      <span class="brand-mark">CMS</span>
+      @if (!collapsed()) {
+        <span class="brand-name">Admin</span>
+      }
+    </a>
+
+    <ul nz-menu nzTheme="dark" nzMode="inline" [nzInlineCollapsed]="collapsed()">
+      <li nz-menu-item nzMatchRouter routerLink="/content-type-builder">
+        <nz-icon nzType="build" />
+        <span>Content-Type Builder</span>
+      </li>
+      <li nz-submenu nzTitle="Content Manager" nzIcon="database" [nzOpen]="true">
+        <ul>
+          @if (collectionTypes().length > 0) {
+            <li nz-menu-group nzTitle="COLLECTION TYPES">
+              <ul>
+                @for (ct of collectionTypes(); track ct.tableName) {
+                  <li nz-menu-item nzMatchRouter [routerLink]="['/content-manager', ct.tableName]">
+                    <span>{{ ct.displayName || ct.tableName }}</span>
+                  </li>
+                }
+              </ul>
+            </li>
+          }
+          @if (singleTypes().length > 0) {
+            <li nz-menu-group nzTitle="SINGLE TYPES">
+              <ul>
+                @for (ct of singleTypes(); track ct.tableName) {
+                  <li nz-menu-item nzMatchRouter [routerLink]="['/content-manager', ct.tableName]">
+                    <span>{{ ct.displayName || ct.tableName }}</span>
+                  </li>
+                }
+              </ul>
+            </li>
+          }
+          @if (contentTypes.types().length === 0) {
+            <li nz-menu-item nzMatchRouter routerLink="/content-manager">
+              <span class="menu-muted">{{ contentTypes.loaded() ? 'Sin tipos todavía' : 'Cargando…' }}</span>
+            </li>
+          }
+        </ul>
+      </li>
+      <li nz-menu-item nzMatchRouter routerLink="/media-library">
+        <nz-icon nzType="picture" />
+        <span>Media Library</span>
+      </li>
+      @if (auth.isSuperAdmin()) {
+        <li nz-menu-item nzMatchRouter routerLink="/super-admin" class="super-admin-nav-item">
+          <nz-icon nzType="crown" class="crown-icon" />
+          <span>Super Admin</span>
+        </li>
+      }
+    </ul>
+  </nz-sider>
+
+  <nz-layout>
+    <nz-header class="header">
+      <div class="header-left">
+        <button
+          nz-button
+          nzType="text"
+          type="button"
+          [attr.aria-label]="collapsed() ? 'Expandir menú' : 'Contraer menú'"
+          (click)="collapsed.set(!collapsed())"
+        >
+          <nz-icon [nzType]="collapsed() ? 'menu-unfold' : 'menu-fold'" />
+        </button>
+
+        <!-- Project Selector Dropdown -->
+        <div class="project-selector-wrapper">
+          <button
+            nz-button
+            nzType="default"
+            type="button"
+            class="project-selector-btn"
+            nz-dropdown
+            nzTrigger="click"
+            [nzDropdownMenu]="projectMenu"
+          >
+            @if (projectsService.activeProject()?.imageUrl) {
+              <img [src]="projectsService.activeProject()?.imageUrl" class="project-btn-avatar" alt="Logo" />
+            } @else {
+              <nz-icon nzType="appstore" />
+            }
+            <span class="project-active-name">
+              {{ projectsService.activeProject()?.name || 'Cargando...' }}
+            </span>
+            <nz-tag class="project-slug-tag" nzColor="blue">
+              {{ projectsService.activeSlug() }}
+            </nz-tag>
+            <nz-icon nzType="down" class="dropdown-chevron" />
+          </button>
+
+          <nz-dropdown-menu #projectMenu="nzDropdownMenu">
+            <ul nz-menu class="project-menu">
+              <li nz-menu-group nzTitle="PROYECTOS CMS">
+                <ul>
+                  @for (proj of projectsService.projects(); track proj.id) {
+                    <li
+                      nz-menu-item
+                      [nzSelected]="projectsService.activeSlug() === proj.slug"
+                      (click)="selectProject(proj)"
+                    >
+                      <div class="project-menu-item">
+                        @if (proj.imageUrl) {
+                          <img [src]="proj.imageUrl" class="project-item-avatar" alt="Logo" />
+                        } @else {
+                          <nz-icon nzType="appstore" class="project-item-icon" />
+                        }
+                        <div class="project-menu-info">
+                          <span class="project-name">{{ proj.name }}</span>
+                          <span class="project-slug-sub">/{{ proj.slug }}</span>
+                        </div>
+                        @if (projectsService.activeSlug() === proj.slug) {
+                          <nz-icon nzType="check" class="check-icon" />
+                        }
+                      </div>
+                    </li>
+                  }
+                </ul>
+              </li>
+              @if (auth.isSuperAdmin()) {
+                <li nz-menu-divider></li>
+                <li nz-menu-item (click)="openCreateProjectModal()">
+                  <nz-icon nzType="plus" />
+                  <span class="new-project-label">Nuevo Proyecto</span>
+                </li>
+              }
+            </ul>
+          </nz-dropdown-menu>
+        </div>
+      </div>
+
+      <button
+        nz-button
+        nzType="text"
+        type="button"
+        class="user"
+        nz-dropdown
+        nzTrigger="click"
+        nzPlacement="bottomRight"
+        aria-label="Menú de usuario"
+        [nzDropdownMenu]="userMenu"
+      >
+        <nz-avatar nzIcon="user" nzSize="small" />
+        @if (profile(); as user) {
+          <span class="user-name">{{ user.username }}</span>
+        }
+      </button>
+      <nz-dropdown-menu #userMenu="nzDropdownMenu">
+        <ul nz-menu>
+          @if (profile(); as user) {
+            <li nz-menu-item nzDisabled>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span>{{ user.email }}</span>
+                <nz-tag [nzColor]="user.role === 'superadmin' ? 'magenta' : 'blue'" style="width: fit-content;">
+                  {{ user.role === 'superadmin' ? 'Super Admin' : user.role }}
+                </nz-tag>
+              </div>
+            </li>
+            <li nz-menu-divider></li>
+          }
+          <li nz-menu-item (click)="logout()">
+            <nz-icon nzType="logout" />
+            Cerrar sesión
+          </li>
+        </ul>
+      </nz-dropdown-menu>
+    </nz-header>
+
+    <nz-content class="content">
+      <router-outlet />
+    </nz-content>
+  </nz-layout>
+</nz-layout>
+
+<!-- Modal Crear Proyecto -->
+<nz-modal
+  [nzVisible]="createModalVisible()"
+  nzTitle="Crear Nuevo Proyecto"
+  [nzOkLoading]="creatingProject()"
+  (nzOnCancel)="closeCreateProjectModal()"
+  (nzOnOk)="submitCreateProject()"
+  nzOkText="Crear Proyecto"
+  nzCancelText="Cancelar"
+>
+  <ng-container *nzModalContent>
+    <form nz-form nzLayout="vertical">
+      <nz-form-item>
+        <nz-form-label nzRequired>Nombre del Proyecto</nz-form-label>
+        <nz-form-control nzErrorTip="Por favor escribe el nombre del proyecto">
+          <input
+            nz-input
+            placeholder="ej. Mi Tienda Online"
+            [ngModel]="projectName"
+            (ngModelChange)="onNameInput($event)"
+            name="projectName"
+            required
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzRequired>Identificador (Slug / Prefijo DB)</nz-form-label>
+        <nz-form-control
+          nzExtra="Se usará como subcarpeta en /schemas/{slug} y prefijo en PostgreSQL (content_{slug}_*)"
+        >
+          <input
+            nz-input
+            placeholder="ej. mi_tienda"
+            [ngModel]="projectSlug"
+            (ngModelChange)="onSlugInput($event)"
+            name="projectSlug"
+            required
+          />
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label>Descripción (opcional)</nz-form-label>
+        <nz-form-control>
+          <textarea
+            nz-input
+            rows="3"
+            placeholder="Breve descripción del proyecto o cliente"
+            [(ngModel)]="projectDescription"
+            name="projectDescription"
+          ></textarea>
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label>Logo / Imagen del Proyecto (opcional)</nz-form-label>
+        <nz-form-control nzExtra="Sube una imagen o ingresa una URL para identificar visualmente este proyecto.">
+          <div class="image-uploader-control">
+            <input
+              #layoutFileInput
+              type="file"
+              accept="image/*"
+              style="display: none"
+              (change)="uploadImage($event)"
+            />
+            <div class="image-input-row">
+              <input
+                nz-input
+                placeholder="https://... o /uploads/..."
+                [(ngModel)]="projectImageUrl"
+                name="projectImageUrl"
+              />
+              <button
+                nz-button
+                nzType="default"
+                type="button"
+                [nzLoading]="uploadingCreateImage()"
+                (click)="layoutFileInput.click()"
+              >
+                <nz-icon nzType="upload" />
+                Subir
+              </button>
+            </div>
+
+            @if (projectImageUrl) {
+              <div class="image-preview-wrapper">
+                <img [src]="projectImageUrl" class="image-preview" alt="Vista previa de logo" />
+                <button
+                  nz-button
+                  nzType="text"
+                  nzDanger
+                  nzSize="small"
+                  type="button"
+                  (click)="clearImage()"
+                >
+                  <nz-icon nzType="delete" /> Quitar imagen
+                </button>
+              </div>
+            }
+          </div>
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>

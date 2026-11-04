@@ -3,18 +3,18 @@ package user
 import (
 	"context"
 
-	"github.com/evrone/go-clean-template/internal/entity"
-	"github.com/evrone/go-clean-template/internal/usecase"
+	"github.com/lucimux/arya/internal/entity"
+	"github.com/lucimux/arya/internal/usecase"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
-const _tracerName = "github.com/evrone/go-clean-template/internal/usecase/user"
+const _tracerName = "github.com/lucimux/arya/internal/usecase/user"
 
 // tracedUseCase wraps a User usecase with OpenTelemetry spans, closing the
-// gap between transport spans (HTTP/gRPC/AMQP/NATS) and repository spans.
+// gap between HTTP spans and repository spans.
 type tracedUseCase struct {
 	next usecase.User
 }
@@ -37,10 +37,12 @@ func endSpan(span trace.Span, err error) {
 	span.End()
 }
 
-func (u *tracedUseCase) Register(ctx context.Context, username, email, password string) (entity.User, error) {
+func (u *tracedUseCase) Register(
+	ctx context.Context, username, email, password string, role entity.Role,
+) (entity.User, error) {
 	ctx, span := startSpan(ctx, "UserUseCase.Register", attribute.String("user.email", email))
 
-	result, err := u.next.Register(ctx, username, email, password)
+	result, err := u.next.Register(ctx, username, email, password, role)
 	endSpan(span, err)
 
 	return result, err
@@ -62,4 +64,22 @@ func (u *tracedUseCase) GetUser(ctx context.Context, userID string) (entity.User
 	endSpan(span, err)
 
 	return result, err
+}
+
+func (u *tracedUseCase) List(ctx context.Context) ([]entity.User, error) {
+	ctx, span := startSpan(ctx, "UserUseCase.List")
+
+	result, err := u.next.List(ctx)
+	endSpan(span, err)
+
+	return result, err
+}
+
+func (u *tracedUseCase) UpdateRole(ctx context.Context, id string, role entity.Role) error {
+	ctx, span := startSpan(ctx, "UserUseCase.UpdateRole", attribute.String("user.id", id), attribute.String("user.role", string(role)))
+
+	err := u.next.UpdateRole(ctx, id, role)
+	endSpan(span, err)
+
+	return err
 }

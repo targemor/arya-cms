@@ -1,0 +1,53 @@
+<main class="login">
+  <nz-card class="login-card" [nzBordered]="false">
+    <header class="login-header">
+      <span class="login-logo" aria-hidden="true">CMS</span>
+      <h1>Iniciar sesión</h1>
+      <p>Panel de administración</p>
+    </header>
+
+    @if (error(); as message) {
+      <nz-alert class="login-error" nzType="error" [nzMessage]="message" nzShowIcon />
+    }
+
+    <form nz-form nzLayout="vertical" [formGroup]="form" (ngSubmit)="submit()">
+      <nz-form-item>
+        <nz-form-label nzFor="email" nzRequired>Email</nz-form-label>
+        <nz-form-control [nzErrorTip]="emailError">
+          <nz-input-wrapper>
+            <nz-icon nzInputPrefix nzType="mail" />
+            <input
+              nz-input
+              id="email"
+              type="email"
+              formControlName="email"
+              autocomplete="username"
+              placeholder="admin@example.com"
+            />
+          </nz-input-wrapper>
+          <ng-template #emailError let-control>
+            @if (control.errors?.['required']) {
+              Introduce tu email.
+            } @else if (control.errors?.['email']) {
+              Introduce un email válido.
+            }
+          </ng-template>
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzFor="password" nzRequired>Contraseña</nz-form-label>
+        <nz-form-control nzErrorTip="Introduce tu contraseña.">
+          <nz-input-password>
+            <nz-icon nzInputPrefix nzType="lock" />
+            <input nz-input id="password" formControlName="password" autocomplete="current-password" />
+          </nz-input-password>
+        </nz-form-control>
+      </nz-form-item>
+
+      <button nz-button nzType="primary" nzBlock nzSize="large" type="submit" [nzLoading]="submitting()">
+        Entrar
+      </button>
+    </form>
+  </nz-card>
+</main>

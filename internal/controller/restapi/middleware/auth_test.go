@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/evrone/go-clean-template/internal/controller/restapi/middleware"
-	"github.com/evrone/go-clean-template/pkg/jwt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/lucimux/arya/internal/controller/restapi/middleware"
+	"github.com/lucimux/arya/pkg/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +29,9 @@ func newTestApp(t *testing.T) (*fiber.App, *jwt.Manager) {
 
 		return c.SendString(userID)
 	})
+	app.Get("/superadmin-only", middleware.RequireRole("superadmin"), func(c *fiber.Ctx) error {
+		return c.SendString("superadmin-content")
+	})
 
 	return app, jwtManager
 }
@@ -38,7 +41,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	app, jwtManager := newTestApp(t)
 
-	validToken, err := jwtManager.GenerateToken("user-id-123")
+	validToken, err := jwtManager.GenerateToken("user-id-123", "admin")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -95,4 +98,47 @@ func TestAuthMiddleware(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequireRole(t *testing.T) {
+	t.Parallel()
+
+	app, jwtManager := newTestApp(t)
+
+	adminToken, err := jwtManager.GenerateToken("user-1", "admin")
+	require.NoError(t, err)
+
+	superAdminToken, err := jwtManager.GenerateToken("user-2", "superadmin")
+	require.NoError(t, err)
+
+	t.Run("admin forbidden from superadmin route", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/superadmin-only", http.NoBody)
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+
+	t.Run("superadmin allowed", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/superadmin-only", http.NoBody)
+		req.Header.Set("Authorization", "Bearer "+superAdminToken)
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "superadmin-content", string(body))
+	})
 }

@@ -1,10 +1,13 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/joho/godotenv"
 )
 
 type (
@@ -14,10 +17,9 @@ type (
 		HTTP    http
 		Log     log
 		PG      pg
-		GRPC    grpc
-		RMQ     rmq
-		NATS    nats
 		JWT     jwt
+		Schemas schemas
+		Uploads uploads
 		Metrics metrics
 		Swagger swagger
 		Tracing tracing
@@ -46,28 +48,22 @@ type (
 		URL     string `env:"PG_URL,required"`
 	}
 
-	// GRPC -.
-	grpc struct {
-		Port string `env:"GRPC_PORT,required"`
-	}
-
-	// RMQ -.
-	rmq struct {
-		ServerExchange string `env:"RMQ_RPC_SERVER,required"`
-		ClientExchange string `env:"RMQ_RPC_CLIENT,required"`
-		URL            string `env:"RMQ_URL,required"`
-	}
-
-	// NATS -.
-	nats struct {
-		ServerExchange string `env:"NATS_RPC_SERVER,required"`
-		URL            string `env:"NATS_URL,required"`
-	}
-
 	// JWT -.
 	jwt struct {
 		Secret      string        `env:"JWT_SECRET,required"`
 		TokenExpiry time.Duration `env:"JWT_TOKEN_EXPIRY" envDefault:"24h"`
+	}
+
+	// Schemas -.
+	schemas struct {
+		Dir string `env:"SCHEMAS_DIR" envDefault:"./schemas"`
+	}
+
+	// Uploads -.
+	uploads struct {
+		Dir        string `env:"UPLOADS_DIR"         envDefault:"./public/uploads"`
+		PublicPath string `env:"UPLOADS_PUBLIC_PATH" envDefault:"/uploads"`
+		MaxSizeMB  int    `env:"UPLOADS_MAX_SIZE_MB" envDefault:"10"`
 	}
 
 	// Metrics -.
@@ -91,6 +87,10 @@ type (
 
 // NewConfig returns app config.
 func NewConfig() (*Config, error) {
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("godotenv.Load: %w", err)
+	}
+
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
 		return nil, fmt.Errorf("config error: %w", err)

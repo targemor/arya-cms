@@ -1,0 +1,141 @@
+<div class="browser-toolbar">
+  <nz-breadcrumb>
+    <nz-breadcrumb-item>
+      @if (path().length === 0) {
+        <span class="crumb-current"><nz-icon nzType="home" /> {{ rootName }}</span>
+      } @else {
+        <a role="button" tabindex="0" (click)="open(null)" (keydown.enter)="open(null)">
+          <nz-icon nzType="home" /> {{ rootName }}
+        </a>
+      }
+    </nz-breadcrumb-item>
+    @for (folder of path(); track folder.id; let last = $last) {
+      <nz-breadcrumb-item>
+        @if (last) {
+          <span class="crumb-current">{{ folder.name }}</span>
+        } @else {
+          <a role="button" tabindex="0" (click)="open(folder)" (keydown.enter)="open(folder)">{{ folder.name }}</a>
+        }
+      </nz-breadcrumb-item>
+    }
+  </nz-breadcrumb>
+
+  @if (manage()) {
+    <button nz-button type="button" (click)="openCreate()">
+      <nz-icon nzType="folder-add" />
+      Nueva carpeta
+    </button>
+  }
+</div>
+
+@if (subfolders().length > 0) {
+  <div class="folders" nz-row [nzGutter]="[12, 12]">
+    @for (folder of subfolders(); track folder.id) {
+      <div nz-col [nzXs]="12" [nzSm]="8" [nzMd]="6" [nzXl]="4">
+        <div
+          class="folder-tile"
+          role="button"
+          tabindex="0"
+          [attr.aria-label]="'Abrir carpeta ' + folder.name"
+          (click)="open(folder)"
+          (keydown.enter)="open(folder)"
+        >
+          <nz-icon class="folder-icon" nzType="folder" nzTheme="fill" />
+          <span class="folder-name" [title]="folder.name">{{ folder.name }}</span>
+
+          @if (manage()) {
+            <button
+              class="folder-menu"
+              nz-button
+              nzType="text"
+              nzSize="small"
+              type="button"
+              nz-dropdown
+              nzTrigger="click"
+              [nzDropdownMenu]="folderMenu"
+              [attr.aria-label]="'Acciones de la carpeta ' + folder.name"
+              (click)="$event.stopPropagation()"
+              (keydown.enter)="$event.stopPropagation()"
+            >
+              <nz-icon nzType="more" />
+            </button>
+            <nz-dropdown-menu #folderMenu="nzDropdownMenu">
+              <ul nz-menu>
+                <li nz-menu-item (click)="openRename(folder)"><nz-icon nzType="edit" /> Renombrar</li>
+                <li nz-menu-item (click)="openMoveFolder(folder)"><nz-icon nzType="folder" /> Mover a…</li>
+                <li nz-menu-item nzDanger (click)="confirmDelete(folder)"><nz-icon nzType="delete" /> Eliminar</li>
+              </ul>
+            </nz-dropdown-menu>
+          }
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<app-media-gallery
+  [folderId]="folderId()"
+  [deletable]="manage()"
+  [movable]="manage()"
+  [selectable]="!manage()"
+  [selectedId]="selectedId()"
+  [emptyText]="emptyText()"
+  (select)="select.emit($event)"
+  (move)="openMoveFile($event)"
+/>
+
+<nz-modal
+  [nzVisible]="nameDialog() !== null"
+  [nzTitle]="nameDialog()?.mode === 'rename' ? 'Renombrar carpeta' : 'Nueva carpeta'"
+  nzOkText="Guardar"
+  nzCancelText="Cancelar"
+  [nzOkLoading]="saving()"
+  (nzOnOk)="saveName()"
+  (nzOnCancel)="nameDialog.set(null)"
+>
+  <ng-container *nzModalContent>
+    <form nz-form nzLayout="vertical" [formGroup]="nameForm" (ngSubmit)="saveName()">
+      <nz-form-item>
+        <nz-form-label nzFor="folder-name" nzRequired>Nombre</nz-form-label>
+        <nz-form-control [nzErrorTip]="nameError">
+          <input nz-input id="folder-name" formControlName="name" autocomplete="off" placeholder="Portadas" />
+        </nz-form-control>
+      </nz-form-item>
+      <ng-template #nameError let-control>
+        @if (control.errors?.['required']) {
+          Escribe un nombre.
+        } @else if (control.errors?.['slash']) {
+          El nombre no puede llevar «/» ni «\».
+        } @else if (control.errors?.['maxlength']) {
+          Máximo 100 caracteres.
+        }
+      </ng-template>
+    </form>
+  </ng-container>
+</nz-modal>
+
+<nz-modal
+  [nzVisible]="moveDialog() !== null"
+  nzTitle="Mover a…"
+  nzOkText="Mover"
+  nzCancelText="Cancelar"
+  [nzOkLoading]="saving()"
+  (nzOnOk)="confirmMove()"
+  (nzOnCancel)="moveDialog.set(null)"
+>
+  <ng-container *nzModalContent>
+    @if (moveDialog(); as dialog) {
+      <p class="move-subject">
+        {{ dialog.kind === 'file' ? 'Archivo' : 'Carpeta' }}:
+        <strong>{{ dialog.kind === 'file' ? dialog.file.name : dialog.folder.name }}</strong>
+      </p>
+    }
+    <nz-tree-select
+      class="move-target"
+      nzPlaceHolder="Elige la carpeta de destino"
+      nzDefaultExpandAll
+      [nzNodes]="moveNodes()"
+      [formControl]="moveControl"
+    />
+  </ng-container>
+</nz-modal>

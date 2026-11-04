@@ -1,0 +1,318 @@
+@if (!tableName()) {
+  <h2>Content Manager</h2>
+  <div class="types-overview">
+    @if (collectionTypes().length > 0) {
+      <nz-card nzTitle="COLLECTION TYPES" class="overview-card">
+        @for (ct of collectionTypes(); track ct.tableName) {
+          <a class="type-link" [routerLink]="['/content-manager', ct.tableName]">
+            <nz-icon nzType="database" />
+            {{ ct.displayName || ct.tableName }}
+          </a>
+        }
+      </nz-card>
+    }
+    @if (singleTypes().length > 0) {
+      <nz-card nzTitle="SINGLE TYPES" class="overview-card">
+        @for (ct of singleTypes(); track ct.tableName) {
+          <a class="type-link" [routerLink]="['/content-manager', ct.tableName]">
+            <nz-icon nzType="file-text" />
+            {{ ct.displayName || ct.tableName }}
+          </a>
+        }
+      </nz-card>
+    }
+    @if (contentTypes.types().length === 0) {
+      <nz-card>
+        <nz-empty [nzNotFoundContent]="contentTypes.loaded() ? 'Aún no hay tipos de contenido.' : 'Cargando…'">
+          @if (contentTypes.loaded()) {
+            <ng-template #nzNotFoundFooter>
+              <a nz-button nzType="primary" routerLink="/content-type-builder">Crear un tipo de contenido</a>
+            </ng-template>
+          }
+        </nz-empty>
+      </nz-card>
+    }
+  </div>
+} @else if (contentType(); as ct) {
+  @if (isSingleType()) {
+    <div class="page-header">
+      <div class="title-with-badge">
+        <h2>{{ ct.displayName || ct.tableName }}</h2>
+        <nz-tag nzColor="blue">Single Type</nz-tag>
+      </div>
+      <button nz-button nzType="primary" type="button" [nzLoading]="singleSaving()" (click)="saveSingle()">
+        <nz-icon nzType="save" />
+        Guardar
+      </button>
+    </div>
+
+    @if (singleLoadFailed()) {
+      <nz-result nzStatus="warning" nzTitle="No se pudo cargar la entrada.">
+        <div nz-result-extra>
+          <button nz-button type="button" (click)="reloadSingle()">Reintentar</button>
+        </div>
+      </nz-result>
+    } @else if (singleLoading()) {
+      <div class="loading-state">
+        <nz-spin nzSimple nzTip="Cargando entrada…" />
+      </div>
+    } @else if (singleForm(); as f) {
+      <nz-card class="single-card">
+        <form nz-form nzLayout="vertical" [formGroup]="f" (ngSubmit)="saveSingle()">
+          <ng-container
+            *ngTemplateOutlet="attributeFields; context: { formGroup: f, attrs: ct.attributes, parent: singleEntry() }"
+          />
+          <div class="single-actions">
+            <button nz-button nzType="primary" type="submit" [nzLoading]="singleSaving()">
+              <nz-icon nzType="save" />
+              Guardar
+            </button>
+          </div>
+        </form>
+      </nz-card>
+    }
+  } @else {
+    <div class="page-header">
+      <div class="title-with-badge">
+        <h2>{{ ct.displayName || ct.tableName }}</h2>
+        <span class="entries-count">{{ total() }} entradas encontradas</span>
+      </div>
+      <button nz-button nzType="primary" type="button" (click)="openCreate()">
+        <nz-icon nzType="plus" />
+        Crear nuevo
+      </button>
+    </div>
+
+    @if (loadFailed()) {
+      <nz-result nzStatus="warning" nzTitle="No se pudieron cargar las entradas.">
+        <div nz-result-extra>
+          <button nz-button type="button" (click)="reload()">Reintentar</button>
+        </div>
+      </nz-result>
+    } @else {
+      <nz-table
+        #table
+        nzSize="middle"
+        nzShowSizeChanger
+        [nzData]="entries()"
+        [nzFrontPagination]="false"
+        [nzTotal]="total()"
+        [nzPageIndex]="query().page"
+        [nzPageSize]="query().pageSize"
+        [nzPageSizeOptions]="[10, 20, 50, 100]"
+        [nzLoading]="loading()"
+        [nzScroll]="{ x: 'max-content' }"
+        [nzNoResult]="noEntries"
+        (nzQueryParams)="onQueryParams($event)"
+      >
+        <thead>
+          <tr>
+            @for (attr of ct.attributes; track attr.name) {
+              @if (attr.type === 'media' || attr.type === 'component') {
+                <th>{{ getFieldDisplayName(attr) }}</th>
+              } @else {
+                <th [nzColumnKey]="attr.name" [nzSortFn]="true" [nzSortOrder]="sortOrder(attr.name)">{{ getFieldDisplayName(attr) }}</th>
+              }
+            }
+            <th nzColumnKey="createdAt" [nzSortFn]="true" [nzSortOrder]="sortOrder('createdAt')">Creado</th>
+            <th nzRight nzWidth="96px">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of table.data; track entry.id) {
+            <tr>
+              @for (attr of ct.attributes; track attr.name) {
+                <td>
+                  @let value = entry[attr.name];
+                  @if (isEmpty(value)) {
+                    <span class="muted">—</span>
+                  } @else {
+                    @switch (attr.type) {
+                      @case ('boolean') {
+                        <nz-tag [nzColor]="value ? 'green' : 'default'">{{ value ? 'Sí' : 'No' }}</nz-tag>
+                      }
+                      @case ('media') {
+                        @if (isMediaRef(value)) {
+                          <span class="media-cell" [title]="value.name">
+                            @if (fileIcon(value); as icon) {
+                              <nz-icon class="media-cell-icon" [nzType]="icon" />
+                            } @else {
+                              <img [src]="value.url" [alt]="value.alternativeText || value.name" loading="lazy" />
+                            }
+                            <span class="media-cell-name">{{ value.name }}</span>
+                          </span>
+                        }
+                      }
+                      @case ('component') {
+                        @if (attr.repeatable) {
+                          <nz-tag nzColor="purple">{{ asArray(value).length }} elementos</nz-tag>
+                        } @else {
+                          <nz-tag nzColor="cyan">Componente</nz-tag>
+                        }
+                      }
+                      @default {
+                        <span class="text-cell" [title]="value">{{ value }}</span>
+                      }
+                    }
+                  }
+                </td>
+              }
+              <td class="muted">{{ entry.createdAt | date: 'short' }}</td>
+              <td nzRight>
+                <button nz-button nzType="text" nzSize="small" type="button" aria-label="Editar" (click)="openEdit(entry)">
+                  <nz-icon nzType="edit" />
+                </button>
+                <button
+                  nz-button
+                  nzType="text"
+                  nzSize="small"
+                  nzDanger
+                  type="button"
+                  aria-label="Eliminar"
+                  nz-popconfirm
+                  nzPopconfirmTitle="¿Eliminar esta entrada?"
+                  nzOkText="Eliminar"
+                  nzCancelText="Cancelar"
+                  [nzOkDanger]="true"
+                  (nzOnConfirm)="remove(entry)"
+                >
+                  <nz-icon nzType="delete" />
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </nz-table>
+
+      <ng-template #noEntries>
+        <nz-empty nzNotFoundContent="Todavía no hay entradas." />
+      </ng-template>
+    }
+
+    <nz-modal
+      [nzVisible]="modalOpen()"
+      [nzTitle]="editing() ? 'Editar entrada' : 'Nueva entrada en ' + (ct.displayName || ct.tableName)"
+      nzOkText="Guardar"
+      nzCancelText="Cancelar"
+      [nzOkLoading]="saving()"
+      [nzMaskClosable]="false"
+      [nzWidth]="640"
+      (nzOnOk)="save()"
+      (nzOnCancel)="closeModal()"
+    >
+      <ng-container *nzModalContent>
+        @if (form(); as f) {
+          <form nz-form nzLayout="vertical" [formGroup]="f" (ngSubmit)="save()">
+            <ng-container
+              *ngTemplateOutlet="attributeFields; context: { formGroup: f, attrs: ct.attributes, parent: editing() }"
+            />
+            <button type="submit" hidden></button>
+          </form>
+        }
+      </ng-container>
+    </nz-modal>
+  }
+} @else if (contentTypes.loaded()) {
+  <nz-result nzStatus="404" nzTitle="Tipo de contenido no encontrado" [nzSubTitle]="'No existe «' + tableName() + '».'">
+    <div nz-result-extra>
+      <a nz-button nzType="primary" routerLink="/content-manager">Ver tipos de contenido</a>
+    </div>
+  </nz-result>
+}
+
+<ng-template #attributeFields let-fg="formGroup" let-attrs="attrs" let-parent="parent">
+  @for (attr of attrs; track attr.name) {
+    @if (attr.type === 'component') {
+      @let comp = getComponentDef(attr.component);
+      @if (comp) {
+        @if (attr.repeatable) {
+          @let arr = asFormArray(fg.get(attr.name));
+          <div class="component-section">
+            <div class="component-section-header">
+              <span class="component-section-title">
+                <nz-icon nzType="appstore" />
+                {{ getFieldDisplayName(attr) }} ({{ arr.length }})
+              </span>
+            </div>
+            <div class="component-items-container">
+              @for (itemCtrl of arr.controls; track $index) {
+                @let itemGroup = asFormGroup(itemCtrl);
+                @let itemData = parent?.[attr.name]?.[$index];
+                <div class="component-card">
+                  <div class="component-card-header">
+                    <span class="component-item-label">
+                      #{{ $index + 1 }} {{ comp.displayName || comp.name }}
+                    </span>
+                    <button
+                      nz-button
+                      nzType="text"
+                      nzDanger
+                      nzSize="small"
+                      type="button"
+                      (click)="removeComponentItem(arr, $index)"
+                    >
+                      <nz-icon nzType="delete" />
+                    </button>
+                  </div>
+                  <div class="component-card-body" [formGroup]="itemGroup">
+                    <ng-container
+                      *ngTemplateOutlet="attributeFields; context: { formGroup: itemGroup, attrs: comp.attributes, parent: itemData }"
+                    />
+                  </div>
+                </div>
+              }
+            </div>
+            <button nz-button nzType="dashed" nzBlock type="button" class="add-item-btn" (click)="addComponentItem(arr, comp)">
+              <nz-icon nzType="plus" />
+              Agregar a {{ comp.displayName || comp.name }}
+            </button>
+          </div>
+        } @else {
+          @let singleGroup = asFormGroup(fg.get(attr.name));
+          @let singleData = parent?.[attr.name];
+          <div class="component-section">
+            <div class="component-card">
+              <div class="component-card-header">
+                <span class="component-item-label">
+                  <nz-icon nzType="appstore" />
+                  {{ getFieldDisplayName(attr) }}
+                </span>
+              </div>
+              <div class="component-card-body" [formGroup]="singleGroup">
+                <ng-container
+                  *ngTemplateOutlet="attributeFields; context: { formGroup: singleGroup, attrs: comp.attributes, parent: singleData }"
+                />
+              </div>
+            </div>
+          </div>
+        }
+      }
+    } @else {
+      <nz-form-item [formGroup]="fg">
+        <nz-form-label [nzFor]="'field-' + attr.name" [nzRequired]="attr.required">{{ getFieldDisplayName(attr) }}</nz-form-label>
+        <nz-form-control nzErrorTip="Obligatorio.">
+          @switch (attr.type) {
+            @case ('string') {
+              <input nz-input [id]="'field-' + attr.name" [formControlName]="attr.name" />
+            }
+            @case ('integer') {
+              <nz-input-number
+                class="number-input"
+                [nzId]="'field-' + attr.name"
+                [formControlName]="attr.name"
+                [nzPrecision]="0"
+                [nzStep]="1"
+              />
+            }
+            @case ('boolean') {
+              <nz-switch [nzId]="'field-' + attr.name" [formControlName]="attr.name" />
+            }
+            @case ('media') {
+              <app-media-picker [formControlName]="attr.name" [file]="mediaOf(attr.name, parent)" />
+            }
+          }
+        </nz-form-control>
+      </nz-form-item>
+    }
+  }
+</ng-template>

@@ -13,6 +13,9 @@ coverage.txt
 
 docker-compose.yml
 
+# The admin frontend is built and served separately; keep its node_modules out of the build context.
+web
+
 LICENSE
 Makefile
 README*
